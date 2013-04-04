@@ -15,5 +15,6 @@ LDFLAGS = $(LDFLAGS_FUSE)
 
 
 all:
+	@mkdir -p bin
 	"$(CC)" $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o bin/pramfusehpc src/program.c
 
