@@ -24,6 +24,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <attr/xattr.h>
 
 #define bool   long
 #define true   1
@@ -98,7 +99,7 @@ char* p(const char* path)
  * @param   rc  The returned value from the native operation
  * @return      `rc`, or the thrown error negative.
  */
-inline int r(int rc)
+int r(int rc)
 {
   return rc < 0 ? -errno : rc;
 }
@@ -179,7 +180,7 @@ int pram_link(const char* target, const char* path)
   for (int i = 0; i < hddlen; i++)
     *(pathbuf + i) = *(_target + i);
   char* _path = p(path);
-  int rc = r(lgetxattr(_target, _path));
+  int rc = r(link(_target, _path));
   free(_target);
   return rc;
 }
@@ -214,13 +215,132 @@ int pram_mkdir(const char* path, mode_t mode)
  * 
  * @param   path   The file
  * @param   mode   The file's protection bits
- * @param   mode   The file's device specifications
+ * @param   dev    The file's device specifications
  * @return         Error code
  */
 int pram_mknod(const char* path, mode_t mode, dev_t dev)
 {
   return r(mknod(p(path), mode, dev));
 }
+
+/**
+ * Remove extended file attribute
+ * 
+ * @param   path  The file
+ * @param   name  The attribute
+ * @return        Error code
+ */
+int pram_removexattr(const char* path, const char* name)
+{
+  return r(lremovexattr(p(path), name));
+}
+
+/**
+ * Rename file
+ * 
+ * @param   source  The source file
+ * @param   path    The destination file
+ * @return          Error code
+ */
+int pram_rename(const char* source, const char* path)
+{
+  char* _source = p(source);
+  pathbuf = (char*)malloc(pathbufsize);
+  for (int i = 0; i < hddlen; i++)
+    *(pathbuf + i) = *(_source + i);
+  char* _path = p(path);
+  int rc = r(rename(_source, _path));
+  free(_source);
+  return rc;
+}
+
+/**
+ * Remove a directory
+ * 
+ * @param   path  The file
+ * @return        Error code
+ */
+int pram_rmdir(const char* path)
+{
+  return r(rmdir(p(path)));
+}
+
+/**
+ * Set an extended file attribute
+ * 
+ * @param   path   The file
+ * @param   name   The attribute
+ * @param   value  The value
+ * @param   size   The size of the value
+ * @param   flags  Rules
+ * @return         Error code
+ */
+int pram_setxattr(const char* path, const char* name, const char* value, size_t size, int flags)
+{
+  return r(lsetxattr(p(path), name, value, size, flags));
+}
+
+/**
+ * Get file system statistics
+ * 
+ * @param   path   The path
+ * @param   value  The statistics storage
+ * @return         Error code
+ */
+int pram_statfs(const char* path, struct statvfs* value)
+{
+  return r(statvfs(p(path), value));
+}
+
+/**
+ * Create a symbolic link
+ * 
+ * @param   target  The string contained in the link
+ * @param   path    The link to create
+ * @return          Error code
+ */
+int pram_symlink(const char* target, const char* path)
+{
+  return r(symlink(target, p(path)));
+}
+
+/**
+ * Truncate or extend a file to a specified length
+ * 
+ * @param   path    The file
+ * @param   length  The length
+ * @return          Error code
+ */
+int pram_truncate(const char* path, off_t length)
+{
+  return r(truncate(p(path), length));
+}
+
+/**
+ * Remove a link to a file, that is, a file path,
+ * and only the inode if it has no more paths
+ * 
+ * @param   path  The file
+ * @return        Error code
+ */
+int pram_unlink(const char* path)
+{
+  return r(unlink(p(path)));
+}
+
+/**
+ * Read value of a symbolic link
+ * 
+ * @param   path    The file
+ * @param   target  The target storage
+ * @param   size    The size of `target`
+ * @return          Error code
+ */
+int pram_readlink(const char* path, char* target, size_t size)
+{
+  return r(readlink(p(path), target, size));
+}
+
 
 
 /**
@@ -236,7 +356,17 @@ static struct fuse_operations pram_oper = {
   .listxattr = pram_listxattr,
   .mkdir = pram_mkdir,
   .mknod = pram_mknod,
+  .removexattr = pram_removexattr,
+  .rename = pram_rename,
+  .rmdir = pram_rmdir,
+  .setxattr = pram_setxattr,
+  .statfs = pram_statfs,
+  .symlink = pram_symlink,
+  .truncate = pram_truncate,
+  .unlink = pram_unlink,
+  .readlink = pram_readlink,
 };
+
 
 
 /**
