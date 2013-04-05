@@ -341,6 +341,18 @@ int pram_readlink(const char* path, char* target, size_t size)
   return r(readlink(p(path), target, size));
 }
 
+/**
+ * Check real user's permissions for a file
+ * 
+ * @param   path  The file
+ * @param   mode  The permission to test
+ * @return        Error code
+ */
+int pram_access(const char* path, int mode)
+{
+  return r(access(p(path), mode));
+}
+
 
 
 /**
@@ -365,6 +377,7 @@ static struct fuse_operations pram_oper = {
   .truncate = pram_truncate,
   .unlink = pram_unlink,
   .readlink = pram_readlink,
+  .access = pram_access,
 };
 
 
