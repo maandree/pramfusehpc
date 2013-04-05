@@ -92,8 +92,27 @@ char* p(const char* path)
   return pathbuf -= hddlen;
 }
 
+/**
+ * Get the value to return for a FUSE operation
+ * 
+ * @param   rc  The returned value from the native operation
+ * @return      `rc`, or the thrown error negative.
+ */
+inline int r(int rc)
+{
+  return rc < 0 ? -errno : rc;
+}
 
 
+
+
+/**
+ * Clean up the file system for exit
+ */
+void pram_destroy()
+{
+  free(pathbuf);
+}
 
 /**
  * Change the permission bits of a file
@@ -104,7 +123,7 @@ char* p(const char* path)
  */
 int pram_chmod(const char* path, mode_t mode)
 {
-  return -chmod(p(path), mode);
+  return r(chmod(p(path), mode));
 }
 
 /**
@@ -117,17 +136,106 @@ int pram_chmod(const char* path, mode_t mode)
  */
 int pram_chown(const char* path, uid_t owner, gid_t group)
 {
-  return -lchown(p(path), owner, group);
+  return r(lchown(p(path), owner, group));
 }
 
+/**
+ * Get file attributes
+ * 
+ * @param   path  The file
+ * @param   attr  The stat storage
+ * @return        Error code
+ */
+int pram_getattr(const char* path, struct stat* attr)
+{
+  return r(lstat(p(path), attr));
+}
+
+/**
+ * Get extended file attributes
+ * 
+ * @param   path   The file
+ * @param   name   The attribute name
+ * @param   value  The attribute value storage
+ * @param   size   The size of `value`
+ * @return         Error code or value size
+ */
+int pram_getxattr(const char* path, const char* name, char* value, size_t size)
+{
+  return r(lgetxattr(p(path), name, value, size));
+}
+
+/**
+ * Create a hard link to a file
+ * 
+ * @param   target  The target
+ * @param   path    The link
+ * @return          Error code
+ */
+int pram_link(const char* target, const char* path)
+{
+  char* _target = p(target);
+  pathbuf = (char*)malloc(pathbufsize);
+  for (int i = 0; i < hddlen; i++)
+    *(pathbuf + i) = *(_target + i);
+  char* _path = p(path);
+  int rc = r(lgetxattr(_target, _path));
+  free(_target);
+  return rc;
+}
+
+/**
+ * List extended file attributes
+ * 
+ * @param   path   The file
+ * @param   list   The list storage
+ * @param   size   The size of `list`
+ * @return         Error code or value size
+ */
+int pram_listxattr(const char* path, char* list, size_t size)
+{
+  return r(llistxattr(p(path), list, size));
+}
+
+/**
+ * Create a directory
+ * 
+ * @param   path   The file
+ * @param   mode   The file's protection bits
+ * @return         Error code
+ */
+int pram_mkdir(const char* path, mode_t mode)
+{
+  return r(mkdir(p(path), mode));
+}
+
+/**
+ * Create a file node
+ * 
+ * @param   path   The file
+ * @param   mode   The file's protection bits
+ * @param   mode   The file's device specifications
+ * @return         Error code
+ */
+int pram_mknod(const char* path, mode_t mode, dev_t dev)
+{
+  return r(mknod(p(path), mode, dev));
+}
 
 
 /**
  * The file system operations
  */
 static struct fuse_operations pram_oper = {
+  .destroy = pram_destroy,
   .chmod = pram_chmod,
   .chown = pram_chown,
+  .getattr = pram_getattr,
+  .getxattr = pram_getxattr,
+  .link = pram_link,
+  .listxattr = pram_listxattr,
+  .mkdir = pram_mkdir,
+  .mknod = pram_mknod,
 };
 
 
