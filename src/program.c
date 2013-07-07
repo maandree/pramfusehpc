@@ -80,7 +80,7 @@ char* p(const char* path)
   if (n + hddlen > pathbufsize)
     {
       pathbufsize = n + hddlen + 128;
-      pathbuf = (char*)realloc(pathbuf, pathbufsize);
+      pathbuf = (char*)realloc(pathbuf, pathbufsize * sizeof(char));
     }
   pathbuf += hddlen;
   for (long i = 0; i < n; i++)
@@ -171,7 +171,7 @@ int pram_getxattr(const char* path, const char* name, char* value, size_t size)
 int pram_link(const char* target, const char* path)
 {
   char* _target = p(target);
-  pathbuf = (char*)malloc(pathbufsize);
+  pathbuf = (char*)malloc(pathbufsize * sizeof(char));
   for (int i = 0; i < hddlen; i++)
     *(pathbuf + i) = *(_target + i);
   char* _path = p(path);
@@ -240,7 +240,7 @@ int pram_removexattr(const char* path, const char* name)
 int pram_rename(const char* source, const char* path)
 {
   char* _source = p(source);
-  pathbuf = (char*)malloc(pathbufsize);
+  pathbuf = (char*)malloc(pathbufsize * sizeof(char));
   for (int i = 0; i < hddlen; i++)
     *(pathbuf + i) = *(_source + i);
   char* _path = p(path);
@@ -418,7 +418,7 @@ int main(int argc, char** argv)
   for (long s = 0; s < 32; s <<= 1)
     bufsize |= bufsize >> s;
   bufsize += 1;
-  pathbuf = (char*)malloc(bufsize);
+  pathbuf = (char*)malloc(bufsize * sizeof(char));
   for (long i = 0; i < hddlen; i++)
     *(pathbuf + i) = *(hdd + i);
   
