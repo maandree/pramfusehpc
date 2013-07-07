@@ -468,6 +468,15 @@ int pram_fallocate(const char* path, int mode, off_t off, off_t len, struct fuse
   #endif
 }
 
+/**
+ * Apply or remove an advisory lock on a file
+ * 
+ * @param   path  The file
+ * @param   fi    File information
+ * @param   cmd   Lock command
+ * @param   lock  Lock object
+ * @return        Error code
+ */
 int pram_lock(const char *path, struct fuse_file_info *fi, int cmd, struct flock *lock)
 {
   (void) path;
