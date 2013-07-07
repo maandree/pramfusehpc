@@ -152,6 +152,19 @@ int pram_getattr(const char* path, struct stat* attr)
   return r(lstat(p(path), attr));
 }
 
+/**
+ * Get file attributes
+ * 
+ * @param   path  The file
+ * @param   attr  The stat storage
+ * @param   fi    File information
+ * @return        Error code
+ */
+int pram_fgetattr(const char* path, struct stat* attr, struct fuse_file_info *fi)
+{
+return r(fstat(fi->fh, attr));
+}
+
 #ifdef HAVE_SETXATTR
 /**
  * Get extended file attributes
@@ -325,6 +338,19 @@ int pram_truncate(const char* path, off_t length)
 }
 
 /**
+ * Truncate or extend a file to a specified length
+ * 
+ * @param   path    The file
+ * @param   length  The length
+ * @param   fi      File information
+ * @return          Error code
+ */
+int pram_ftruncate(const char* path, off_t length, struct fuse_file_info *fi)
+{
+  return r(ftruncate(fi->fh, length));
+}
+
+/**
  * Remove a link to a file, that is, a file path,
  * and only the inode if it has no more paths
  * 
@@ -375,6 +401,7 @@ static struct fuse_operations pram_oper = {
   .chmod = pram_chmod,
   .chown = pram_chown,
   .getattr = pram_getattr,
+  .fgetattr = pram_fgetattr,
   .link = pram_link,
   .mkdir = pram_mkdir,
   .mknod = pram_mknod,
@@ -383,6 +410,7 @@ static struct fuse_operations pram_oper = {
   .statfs = pram_statfs,
   .symlink = pram_symlink,
   .truncate = pram_truncate,
+  .ftruncate = pram_ftruncate,
   .unlink = pram_unlink,
   .readlink = pram_readlink,
   .access = pram_access,
