@@ -408,6 +408,29 @@ int pram_flock(const char* path, struct fuse_file_info *fi, int op)
   return r(flock(fi->fh, op));
 }
 
+/**
+ * Synchronize changes to a file to the underlaying storage device
+ * 
+ * @param   path        The file
+ * @param   isdatasync  Whether to use `fdatasync` rather than `fsync` if available
+ * @param   fi          File information
+ * @return              Error code
+ */
+int pram_fsync(const char* path, int isdatasync, struct fuse_file_info *fi)
+{
+  (void) path;
+  
+  #ifdef HAVE_FDATASYNC
+    if (isdatasync)
+      return r(fdatasync(fi->fh));
+    else
+      return r(fsync(fi->fh));
+  #else
+    (void) isdatasync;
+    return r(fsync(fi->fh));
+  #endif
+}
+
 
 
 /**
@@ -432,6 +455,7 @@ static struct fuse_operations pram_oper = {
   .readlink = pram_readlink,
   .access = pram_access,
   .flock = pram_flock,
+  .fsync = pram_fsync,
   #ifdef HAVE_POSIX_FALLOCATE
     .getxattr = pram_getxattr,
     .listxattr = pram_listxattr,
