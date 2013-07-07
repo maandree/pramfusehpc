@@ -511,9 +511,9 @@ static struct fuse_operations pram_oper = {
     .setxattr = pram_setxattr,
   #endif
   
-  .flag_nullpath_ok = 1, /* TODO should this be 1 or 0? */
+  .flag_nullpath_ok = true, /* TODO should this be true or false? */
   #if HAVE_UTIMENSAT
-    .flag_utime_omit_ok = 1,
+    .flag_utime_omit_ok = true,
   #endif
 };
 
