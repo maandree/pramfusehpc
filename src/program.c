@@ -79,13 +79,8 @@ char* p(const char* path)
     ;
   if (n + hddlen > pathbufsize)
     {
-      while (n + hddlen > pathbufsize)
-	pathbufsize <<= 1;
-      char* old = pathbuf;
-      pathbuf = (char*)malloc(pathbufsize);
-      for (long i = 0; i < hddlen; i++)
-	*(pathbuf + i) = *(old + i);
-      free(old);
+      pathbufsize = n + hddlen + 128;
+      pathbuf = (char*)realloc(pathbuf, pathbufsize);
     }
   pathbuf += hddlen;
   for (long i = 0; i < n; i++)
