@@ -18,13 +18,18 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#ifdef HAVE_CONFIG_H
+  #include <config.h>
+#endif
 #include <fuse.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <attr/xattr.h>
+#ifdef HAVE_SETXATTR
+  #include <attr/xattr.h>
+#endif
 
 #define bool   long
 #define true   1
@@ -147,6 +152,7 @@ int pram_getattr(const char* path, struct stat* attr)
   return r(lstat(p(path), attr));
 }
 
+#ifdef HAVE_SETXATTR
 /**
  * Get extended file attributes
  * 
@@ -160,6 +166,7 @@ int pram_getxattr(const char* path, const char* name, char* value, size_t size)
 {
   return r(lgetxattr(p(path), name, value, size));
 }
+#endif
 
 /**
  * Create a hard link to a file
@@ -180,6 +187,7 @@ int pram_link(const char* target, const char* path)
   return rc;
 }
 
+#ifdef HAVE_SETXATTR
 /**
  * List extended file attributes
  * 
@@ -192,6 +200,7 @@ int pram_listxattr(const char* path, char* list, size_t size)
 {
   return r(llistxattr(p(path), list, size));
 }
+#endif
 
 /**
  * Create a directory
@@ -210,14 +219,15 @@ int pram_mkdir(const char* path, mode_t mode)
  * 
  * @param   path   The file
  * @param   mode   The file's protection bits
- * @param   dev    The file's device specifications
+ * @param   rdev   The file's device specifications
  * @return         Error code
  */
-int pram_mknod(const char* path, mode_t mode, dev_t dev)
+int pram_mknod(const char* path, mode_t mode, dev_t rdev)
 {
-  return r(mknod(p(path), mode, dev));
+  return r(mknod(p(path), mode, rdev));
 }
 
+#ifdef HAVE_SETXATTR
 /**
  * Remove extended file attribute
  * 
@@ -229,6 +239,7 @@ int pram_removexattr(const char* path, const char* name)
 {
   return r(lremovexattr(p(path), name));
 }
+#endif
 
 /**
  * Rename file
@@ -260,6 +271,7 @@ int pram_rmdir(const char* path)
   return r(rmdir(p(path)));
 }
 
+#ifdef HAVE_SETXATTR
 /**
  * Set an extended file attribute
  * 
@@ -274,6 +286,7 @@ int pram_setxattr(const char* path, const char* name, const char* value, size_t 
 {
   return r(lsetxattr(p(path), name, value, size, flags));
 }
+#endif
 
 /**
  * Get file system statistics
@@ -333,7 +346,11 @@ int pram_unlink(const char* path)
  */
 int pram_readlink(const char* path, char* target, size_t size)
 {
-  return r(readlink(p(path), target, size));
+  long n = readlink(p(path), target, size - 1);
+  if (n < 0)
+    throw errno;
+  *(target + n) = 0;
+  return 0;
 }
 
 /**
@@ -358,21 +375,23 @@ static struct fuse_operations pram_oper = {
   .chmod = pram_chmod,
   .chown = pram_chown,
   .getattr = pram_getattr,
-  .getxattr = pram_getxattr,
   .link = pram_link,
-  .listxattr = pram_listxattr,
   .mkdir = pram_mkdir,
   .mknod = pram_mknod,
-  .removexattr = pram_removexattr,
   .rename = pram_rename,
   .rmdir = pram_rmdir,
-  .setxattr = pram_setxattr,
   .statfs = pram_statfs,
   .symlink = pram_symlink,
   .truncate = pram_truncate,
   .unlink = pram_unlink,
   .readlink = pram_readlink,
   .access = pram_access,
+  #ifdef HAVE_POSIX_FALLOCATE
+    .getxattr = pram_getxattr,
+    .listxattr = pram_listxattr,
+    .removexattr = pram_removexattr,
+    .setxattr = pram_setxattr,
+  #endif
 };
 
 
