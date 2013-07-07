@@ -162,7 +162,8 @@ int pram_getattr(const char* path, struct stat* attr)
  */
 int pram_fgetattr(const char* path, struct stat* attr, struct fuse_file_info *fi)
 {
-return r(fstat(fi->fh, attr));
+  (void) path;
+  return r(fstat(fi->fh, attr));
 }
 
 #ifdef HAVE_SETXATTR
@@ -347,6 +348,7 @@ int pram_truncate(const char* path, off_t length)
  */
 int pram_ftruncate(const char* path, off_t length, struct fuse_file_info *fi)
 {
+  (void) path;
   return r(ftruncate(fi->fh, length));
 }
 
