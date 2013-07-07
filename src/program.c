@@ -23,6 +23,7 @@
 #endif
 #define _GNU_SOURCE
 #include <fuse.h>
+#include <ulockmgr.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -467,6 +468,12 @@ int pram_fallocate(const char* path, int mode, off_t off, off_t len, struct fuse
   #endif
 }
 
+int pram_lock(const char *path, struct fuse_file_info *fi, int cmd, struct flock *lock)
+{
+  (void) path;
+  return ulockmgr_op(fi->fh, cmd, lock, &(fi->lock_owner), sizeof(fi->lock_owner));
+}
+
 
 
 /**
@@ -493,6 +500,7 @@ static struct fuse_operations pram_oper = {
   .flock = pram_flock,
   .fsync = pram_fsync,
   .release = pram_release,
+  .lock = pram_lock,
   #ifdef HAVE_POSIX_FALLOCATE
     .fallocate = pram_fallocate,
   #endif

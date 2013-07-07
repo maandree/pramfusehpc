@@ -11,7 +11,7 @@ LDFLAGS_FUSE = $(shell pkg-config --libs fuse)
 
 CPPFLAGS = -DFUSE_USE_VERSION=29
 CFLAGS = -g -std=gnu11 -Wall -Wextra -pedantic $(CFLAGS_FUSE)
-LDFLAGS = $(LDFLAGS_FUSE)
+LDFLAGS = $(LDFLAGS_FUSE) -lulockmgr
 
 
 all:
