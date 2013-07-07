@@ -27,6 +27,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/file.h>
 #ifdef HAVE_SETXATTR
   #include <attr/xattr.h>
 #endif
@@ -393,6 +394,20 @@ int pram_access(const char* path, int mode)
   return r(access(p(path), mode));
 }
 
+/**
+ * Apply or remove an advisory lock on a file
+ * 
+ * @param   path  The file
+ * @param   fi    File information
+ * @param   op    The lock operation
+ * @return        Error code
+ */
+int pram_flock(const char* path, struct fuse_file_info *fi, int op)
+{
+  (void) path;
+  return r(flock(fi->fh, op));
+}
+
 
 
 /**
@@ -416,6 +431,7 @@ static struct fuse_operations pram_oper = {
   .unlink = pram_unlink,
   .readlink = pram_readlink,
   .access = pram_access,
+  .flock = pram_flock,
   #ifdef HAVE_POSIX_FALLOCATE
     .getxattr = pram_getxattr,
     .listxattr = pram_listxattr,
