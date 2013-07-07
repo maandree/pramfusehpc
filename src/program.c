@@ -21,6 +21,7 @@
 #ifdef HAVE_CONFIG_H
   #include <config.h>
 #endif
+#define _GNU_SOURCE
 #include <fuse.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -431,6 +432,41 @@ int pram_fsync(const char* path, int isdatasync, struct fuse_file_info *fi)
   #endif
 }
 
+/**
+ * Close an open file
+ * 
+ * @param   path  The file
+ * @param   fi    File information
+ * @return        Error code
+ */
+int pram_release(const char* path, struct fuse_file_info *fi)
+{
+  (void) path;
+  return r(close(fi->fh));
+}
+
+/**
+ * Preallocate file space for writing
+ * 
+ * @param   path  The file
+ * @param   mode  The allocation mode
+ * @param   off   The offset in the file
+ * @param   len   The length of the allocation
+ * @param   fi    File information
+ * @return        Error code
+ */
+int pram_fallocate(const char* path, int mode, off_t off, off_t len, struct fuse_file_info *fi)
+{
+  (void) path;
+  #ifdef linux
+    return r(fallocate(fi->fh, mode, off, len));
+  #else
+    if (mode)
+      throw EOPNOTSUPP;
+    throw posix_fallocate(fi->fh, off, len);
+  #endif
+}
+
 
 
 /**
@@ -456,11 +492,20 @@ static struct fuse_operations pram_oper = {
   .access = pram_access,
   .flock = pram_flock,
   .fsync = pram_fsync,
+  .release = pram_release,
   #ifdef HAVE_POSIX_FALLOCATE
+    .fallocate = pram_fallocate,
+  #endif
+  #ifdef HAVE_SETXATTR
     .getxattr = pram_getxattr,
     .listxattr = pram_listxattr,
     .removexattr = pram_removexattr,
     .setxattr = pram_setxattr,
+  #endif
+  
+  .flag_nullpath_ok = 1, /* TODO should this be 1 or 0? */
+  #if HAVE_UTIMENSAT
+    .flag_utime_omit_ok = 1,
   #endif
 };
 
