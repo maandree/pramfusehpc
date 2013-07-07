@@ -469,6 +469,8 @@ int main(int argc, char** argv)
   for (long i = 0; i < hddlen; i++)
     *(pathbuf + i) = *(hdd + i);
   
-  return fuse_main(argc, argv, &pram_oper, null);
+  int rc = fuse_main(argc, argv, &pram_oper, null);
+  free(pathbuf);
+  return rc;
 }
 
