@@ -711,6 +711,20 @@ int pram_open(const char* path, struct fuse_file_info* fi)
   return 0;
 }
 
+#if HAVE_UTIMENSAT
+/**
+ * Update nanosecond precise timestamps
+ * 
+ * @param   path  The file
+ * @param   ts    Time stamps
+ * @return        Error code
+ */
+int pram_utimens(const char* path, const struct timespec ts[2])
+{
+  return r(utimensat(0, p(path), ts, AT_SYMLINK_NOFOLLOW));
+}
+#endif
+
 
 
 /**
@@ -756,6 +770,9 @@ static struct fuse_operations pram_oper = {
     .listxattr = pram_listxattr,
     .removexattr = pram_removexattr,
     .setxattr = pram_setxattr,
+  #endif
+  #if HAVE_UTIMENSAT
+    .utimens = pram_utimens,
   #endif
   
   .flag_nullpath_ok = true, /* TODO should this be true or false? */
@@ -817,7 +834,6 @@ int main(int argc, char** argv)
 }
 
   /*
-utimes  HAVE_UTIMENSAT
 what is poll? (used by fsel)
 ioctl (used by fioc)
 http://fuse.sourceforge.net/doxygen/structfuse__operations.html#ae3f3482e33a0eada0292350d76b82901
