@@ -617,7 +617,7 @@ int pram_releasedir(const char* path, struct fuse_file_info* fi)
  * Open a directory
  * 
  * @param   path  The file
- * @param   fi    File information to fill
+ * @param   fi    File information
  * @return        Error code
  */
 int pram_opendir(const char* path, struct fuse_file_info* fi)
@@ -644,7 +644,7 @@ int pram_opendir(const char* path, struct fuse_file_info* fi)
  * @param   buf     Read buffer
  * @param   filler  Function used to fill the buffer
  * @param   off     Read offset
- * @param   fi      File information to fill
+ * @param   fi      File information
  * @return          Error code
  */
 int pram_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t off, struct fuse_file_info* fi)
@@ -673,6 +673,39 @@ int pram_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t off,
       di->entry = null;
       di->offset = next_offset;
     }
+  return 0;
+}
+
+/**
+ * Create a file
+ * 
+ * @param   path  The file
+ * @param   mode  File mode
+ * @param   fi    File information
+ * @return        Error code
+ */
+int pram_create(const char* path, mode_t mode, struct fuse_file_info* fi)
+{
+  int fd = open(path, fi->flags, mode);
+  if (fd < 0)
+    throw fd;
+  fi->fh = fd;
+  return 0;
+}
+
+/**
+ * Open a file
+ * 
+ * @param   path  The file
+ * @param   fi    File information
+ * @return        Error code
+ */
+int pram_open(const char* path, struct fuse_file_info* fi)
+{
+  int fd = open(path, fi->flags);
+  if (fd < 0)
+    throw fd;
+  fi->fh = fd;
   return 0;
 }
 
@@ -711,6 +744,8 @@ static struct fuse_operations pram_oper = {
   .releasedir = pram_releasedir,
   .opendir = pram_opendir,
   .readdir = pram_readdir,
+  .create = pram_create,
+  .open = pram_open,
   #ifdef HAVE_POSIX_FALLOCATE
     .fallocate = pram_fallocate,
   #endif
@@ -781,8 +816,6 @@ int main(int argc, char** argv)
 
   /*
 utimes  HAVE_UTIMENSAT
-open
-create
 what is poll? (used by fsel)
 ioctl (used by fioc)
 http://fuse.sourceforge.net/doxygen/structfuse__operations.html#ae3f3482e33a0eada0292350d76b82901
