@@ -29,6 +29,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/file.h>
 #ifdef HAVE_SETXATTR
   #include <attr/xattr.h>
@@ -483,6 +485,20 @@ int pram_lock(const char *path, struct fuse_file_info *fi, int cmd, struct flock
   return ulockmgr_op(fi->fh, cmd, lock, &(fi->lock_owner), sizeof(fi->lock_owner));
 }
 
+/**
+ * Flush file
+ * 
+ * @param   path  The file
+ * @param   fi    File information
+ * @return        Error code
+ */
+int pram_flush(const char *path, struct fuse_file_info *fi)
+{
+  (void) path;
+  /* FILE* is needed for fflush, and there is not flush, so we need to duplicate and close  */
+  return r(close(dup(fi->fh)));
+}
+
 
 
 /**
@@ -510,6 +526,7 @@ static struct fuse_operations pram_oper = {
   .fsync = pram_fsync,
   .release = pram_release,
   .lock = pram_lock,
+  .flush = pram_flush,
   #ifdef HAVE_POSIX_FALLOCATE
     .fallocate = pram_fallocate,
   #endif
@@ -578,3 +595,26 @@ int main(int argc, char** argv)
   return rc;
 }
 
+  /*
+
+readdir
+utimes  HAVE_UTIMENSAT
+open
+read
+write
+opendir
+releasedir
+create
+read_buf
+write_buf
+what is poll? (used by fsel)
+ioctl (used by fioc)
+http://fuse.sourceforge.net/doxygen/structfuse__operations.html#ae3f3482e33a0eada0292350d76b82901
+
+
+use of pthread
+read cusexmp
+what about fadvice?
+
+
+   */
