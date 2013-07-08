@@ -499,6 +499,81 @@ int pram_flush(const char *path, struct fuse_file_info *fi)
   return r(close(dup(fi->fh)));
 }
 
+/**
+ * Write a buffer to a position in a file
+ * 
+ * @param    path  The file
+ * @param    buf   The buffer to write
+ * @param    len   The number of bytes to write
+ * @param    off   The offset in the file at which to start the write
+ * @param    fi    File information
+ * @return         Error code if negative, and number of written bytes if non-negative
+ */
+int pram_write(const char* path, const char* buf, size_t len, off_t off, struct fuse_file_info *fi)
+{
+  (void) path;
+  return r(pwrite(fi->fh, buf, len, off));
+}
+
+/**
+ * Read a part of a file
+ * 
+ * @param    path  The file
+ * @param    buf   The buffer to which to write read bytes
+ * @param    len   The number of bytes to read
+ * @param    off   The offset in the file at which to start the read
+ * @param    fi    File information
+ * @return         Error code if negative, and number of read bytes if non-negative
+ */
+int pram_read(const char* path, char* buf, size_t len, off_t off, struct fuse_file_info *fi)
+{
+  (void) path;
+  return r(pread(fi->fh, buf, len, off));
+}
+
+/**
+ * Write a buffer to a position in a file
+ * 
+ * @param    path  The file
+ * @param    buf   The buffer to write
+ * @param    off   The offset in the file at which to start the write
+ * @param    fi    File information
+ * @return         Error code if negative, and number of written bytes if non-negative
+ */
+int pram_write_buf(const char* path, const char* buf, off_t off, struct fuse_file_info *fi)
+{
+  (void) path;
+  struct fuse_bufvec dest = FUSE_BUFVEC_INIT(fuse_buf_size(buf));
+  dest.buf->flags = FUSE_BUF_IS_FD | FUSE_BUF_FD_SEEK;
+  dest.buf->fd = fi->fh;
+  dest.buf->pos = off;
+  return fuse_buf_copy(&dest, buf, FUSE_BUF_SPLICE_NONBLOCK);
+}
+
+/**
+ * Read a part of a file
+ * 
+ * @param    path  The file
+ * @param    bufp  The buffer to which to write read bytes
+ * @param    len   The number of bytes to read
+ * @param    off   The offset in the file at which to start the read
+ * @param    fi    File information
+ * @return         Error code
+ */
+int pram_read_buf(const char* path, struct fuse_bufvec** bufp, size_t len, off_t off, struct fuse_file_info *fi)
+{
+  (void) path;
+  struct fuse_bufvec* src = (fuse_bufvec*)malloc(sizeof(struct fuse_bufvec));
+  if (buf == null)
+    throw ENOMEM;
+  *src = FUSE_BUFVEC_INIT(len);
+  src->buf->flags = FUSE_BUF_IS_FD | FUSE_BUF_FD_SEEK;
+  src->buf->fd = fi->fh;
+  src->buf->pos = off;
+  *bufp = src;
+  return 0
+}
+
 
 
 /**
@@ -527,6 +602,10 @@ static struct fuse_operations pram_oper = {
   .release = pram_release,
   .lock = pram_lock,
   .flush = pram_flush,
+  .write = pram_write,
+  .read = pram_read,
+  .write_buf = pram_write_buf,
+  .read_buf = pram_read_buf,
   #ifdef HAVE_POSIX_FALLOCATE
     .fallocate = pram_fallocate,
   #endif
@@ -596,25 +675,17 @@ int main(int argc, char** argv)
 }
 
   /*
-
 readdir
 utimes  HAVE_UTIMENSAT
 open
-read
-write
 opendir
 releasedir
 create
-read_buf
-write_buf
 what is poll? (used by fsel)
 ioctl (used by fioc)
 http://fuse.sourceforge.net/doxygen/structfuse__operations.html#ae3f3482e33a0eada0292350d76b82901
 
-
 use of pthread
 read cusexmp
 what about fadvice?
-
-
    */
