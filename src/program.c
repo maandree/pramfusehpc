@@ -24,6 +24,7 @@
 #define _GNU_SOURCE
 #include <fuse.h>
 #include <ulockmgr.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h> /* for memset */
@@ -59,6 +60,11 @@ static long hddlen = 0;
  * The size of `pathbuf`
  */
 static long pathbufsize = 0;
+
+/**
+ * Thread mutex
+ */
+static pthread_mutex_t pram_mutex;
 
 
 
@@ -784,6 +790,20 @@ static struct fuse_operations pram_oper = {
 
 
 /**
+ * Pthread start routine for background thread
+ * 
+ * @param   data  Private use input data
+ * @return        Private use output data
+ */
+/*void* pram_background(void* data)
+{
+  (void) data;
+  return null;
+}*/
+
+
+
+/**
  * This is the main entry point of the program
  * 
  * @param   argc  The number of elements in `argv`
@@ -817,6 +837,27 @@ int main(int argc, char** argv)
       return 1;
     }
   
+  /* pthread_t background_thread; */
+  pthread_attr_t pth_attr;
+  
+  if ((errno = pthread_mutex_init(&pram_mutex, null)))
+    {
+      perror("pthread_mutex_init");
+      return 1;
+    }
+  if ((errno = pthread_attr_init(&pth_attr)))
+    {
+      perror("pthread_attr_init");
+      return 1;
+    }
+  /*
+  if ((errno = pthread_create(&background_thread, &pth_attr, pram_background, null)))
+    {
+      perror("pthread_create");
+      return 1;
+    }
+  */
+  
   hddlen = 0;
   for (long i = 0; (*(hdd + i)); i++)
     hddlen++;
@@ -830,15 +871,16 @@ int main(int argc, char** argv)
   
   int rc = fuse_main(argc, argv, &pram_oper, null);
   free(pathbuf);
+  /* pthread_cancel(background_thread); */
+  /* pthread_join(background_thread, null); */
   return rc;
 }
 
   /*
-what is poll? (used by fsel)
-ioctl (used by fioc)
+ioctl(const char* path, int request, void* arg, struct fuse_file_info* fi, unsigned int flags, void* data)
 http://fuse.sourceforge.net/doxygen/structfuse__operations.html#ae3f3482e33a0eada0292350d76b82901
-
-use of pthread
-read cusexmp
 what about fadvice?
+what about readahead?
+
+what is poll? (used by fsel)
    */
