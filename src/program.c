@@ -69,6 +69,16 @@ struct pram_dir_info
    * DIR object create when opening the directory
    */
   DIR* dp;
+  
+  /**
+   * Read directory information
+   */
+  struct dirent* entry;
+  
+  /**
+   * Offset
+   */
+  off_t offset;
 };
 
 
@@ -603,6 +613,69 @@ int pram_releasedir(const char* path, struct fuse_file_info* fi)
   return err;
 }
 
+/**
+ * Open a directory
+ * 
+ * @param   path  The file
+ * @param   fi    File information to fill
+ * @return        Error code
+ */
+int pram_opendir(const char* path, struct fuse_file_info* fi)
+{
+  struct pram_dir_info* di = (pram_dir_info*)malloc(sizeof(struct pram_dir_info));
+  if (di == null)
+    throw ENOMEM;
+  if ((di->dp = opendir(path)) == null)
+    {
+      int error = errno;
+      free(d);
+      throw error;
+    }
+  di->entry = null;
+  di->offset = 0;
+  fi->dh = (long)di;
+  return 0;
+}
+
+/**
+ * Read a directory
+ * 
+ * @param   path    The file
+ * @param   buf     Read buffer
+ * @param   filler  Function used to fill the buffer
+ * @param   off     Read offset
+ * @param   fi      File information to fill
+ * @return          Error code
+ */
+int pram_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t off, struct fuse_file_info* fi)
+{
+  (void) path;
+  struct pram_dir_info* di = (struct pram_dir_info*)(uintptr_t)(fi->fh);
+  if (off != di->offset)
+    {
+      seekdir(di->dp, off);
+      d->entry = null;
+      d->offset = off;
+    }
+  for (;;)
+    {
+      struct stat st;
+      off_t next_offset;
+      if (di->entry == null)
+	  if ((di->entry = readdir(di->dp)) == null)
+	    break;
+      memset(&st, 0, sizeof(struct stat));
+      st.st_ino = di->entry->d_ino;
+      st.st_mode = di->entry->d_type << 12;
+      next_offset = telldir(di->dp);
+      if (filler(buf, di->entry->d_name, &st, next_offset))
+	break;
+      di->entry = null;
+      di->offset = next_offset;
+    }
+  return 0;
+}
+
 
 
 /**
@@ -636,6 +709,8 @@ static struct fuse_operations pram_oper = {
   .write_buf = pram_write_buf,
   .read_buf = pram_read_buf,
   .releasedir = pram_releasedir,
+  .opendir = pram_opendir,
+  .readdir = pram_readdir,
   #ifdef HAVE_POSIX_FALLOCATE
     .fallocate = pram_fallocate,
   #endif
@@ -705,10 +780,8 @@ int main(int argc, char** argv)
 }
 
   /*
-readdir
 utimes  HAVE_UTIMENSAT
 open
-opendir
 create
 what is poll? (used by fsel)
 ioctl (used by fioc)
