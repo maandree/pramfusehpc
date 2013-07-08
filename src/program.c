@@ -61,6 +61,19 @@ static long pathbufsize = 0;
 
 
 /**
+ * Information for opened directories
+ */
+struct pram_dir_info
+{
+  /**
+   * DIR object create when opening the directory
+   */
+  DIR* dp;
+};
+
+
+
+/**
  * Compare two NUL-terminated strings against each other
  * 
  * @param   a  The first comparand
@@ -165,7 +178,7 @@ int pram_getattr(const char* path, struct stat* attr)
  * @param   fi    File information
  * @return        Error code
  */
-int pram_fgetattr(const char* path, struct stat* attr, struct fuse_file_info *fi)
+int pram_fgetattr(const char* path, struct stat* attr, struct fuse_file_info* fi)
 {
   (void) path;
   return r(fstat(fi->fh, attr));
@@ -351,7 +364,7 @@ int pram_truncate(const char* path, off_t length)
  * @param   fi      File information
  * @return          Error code
  */
-int pram_ftruncate(const char* path, off_t length, struct fuse_file_info *fi)
+int pram_ftruncate(const char* path, off_t length, struct fuse_file_info* fi)
 {
   (void) path;
   return r(ftruncate(fi->fh, length));
@@ -406,7 +419,7 @@ int pram_access(const char* path, int mode)
  * @param   op    The lock operation
  * @return        Error code
  */
-int pram_flock(const char* path, struct fuse_file_info *fi, int op)
+int pram_flock(const char* path, struct fuse_file_info* fi, int op)
 {
   (void) path;
   return r(flock(fi->fh, op));
@@ -420,7 +433,7 @@ int pram_flock(const char* path, struct fuse_file_info *fi, int op)
  * @param   fi          File information
  * @return              Error code
  */
-int pram_fsync(const char* path, int isdatasync, struct fuse_file_info *fi)
+int pram_fsync(const char* path, int isdatasync, struct fuse_file_info* fi)
 {
   (void) path;
   
@@ -442,7 +455,7 @@ int pram_fsync(const char* path, int isdatasync, struct fuse_file_info *fi)
  * @param   fi    File information
  * @return        Error code
  */
-int pram_release(const char* path, struct fuse_file_info *fi)
+int pram_release(const char* path, struct fuse_file_info* fi)
 {
   (void) path;
   return r(close(fi->fh));
@@ -458,7 +471,7 @@ int pram_release(const char* path, struct fuse_file_info *fi)
  * @param   fi    File information
  * @return        Error code
  */
-int pram_fallocate(const char* path, int mode, off_t off, off_t len, struct fuse_file_info *fi)
+int pram_fallocate(const char* path, int mode, off_t off, off_t len, struct fuse_file_info* fi)
 {
   (void) path;
   #ifdef linux
@@ -479,7 +492,7 @@ int pram_fallocate(const char* path, int mode, off_t off, off_t len, struct fuse
  * @param   lock  Lock object
  * @return        Error code
  */
-int pram_lock(const char *path, struct fuse_file_info *fi, int cmd, struct flock *lock)
+int pram_lock(const char* path, struct fuse_file_info* fi, int cmd, struct flock* lock)
 {
   (void) path;
   return ulockmgr_op(fi->fh, cmd, lock, &(fi->lock_owner), sizeof(fi->lock_owner));
@@ -492,7 +505,7 @@ int pram_lock(const char *path, struct fuse_file_info *fi, int cmd, struct flock
  * @param   fi    File information
  * @return        Error code
  */
-int pram_flush(const char *path, struct fuse_file_info *fi)
+int pram_flush(const char* path, struct fuse_file_info* fi)
 {
   (void) path;
   /* FILE* is needed for fflush, and there is not flush, so we need to duplicate and close  */
@@ -509,7 +522,7 @@ int pram_flush(const char *path, struct fuse_file_info *fi)
  * @param    fi    File information
  * @return         Error code if negative, and number of written bytes if non-negative
  */
-int pram_write(const char* path, const char* buf, size_t len, off_t off, struct fuse_file_info *fi)
+int pram_write(const char* path, const char* buf, size_t len, off_t off, struct fuse_file_info* fi)
 {
   (void) path;
   return r(pwrite(fi->fh, buf, len, off));
@@ -525,7 +538,7 @@ int pram_write(const char* path, const char* buf, size_t len, off_t off, struct 
  * @param    fi    File information
  * @return         Error code if negative, and number of read bytes if non-negative
  */
-int pram_read(const char* path, char* buf, size_t len, off_t off, struct fuse_file_info *fi)
+int pram_read(const char* path, char* buf, size_t len, off_t off, struct fuse_file_info* fi)
 {
   (void) path;
   return r(pread(fi->fh, buf, len, off));
@@ -540,7 +553,7 @@ int pram_read(const char* path, char* buf, size_t len, off_t off, struct fuse_fi
  * @param    fi    File information
  * @return         Error code if negative, and number of written bytes if non-negative
  */
-int pram_write_buf(const char* path, const char* buf, off_t off, struct fuse_file_info *fi)
+int pram_write_buf(const char* path, const char* buf, off_t off, struct fuse_file_info* fi)
 {
   (void) path;
   struct fuse_bufvec dest = FUSE_BUFVEC_INIT(fuse_buf_size(buf));
@@ -560,7 +573,7 @@ int pram_write_buf(const char* path, const char* buf, off_t off, struct fuse_fil
  * @param    fi    File information
  * @return         Error code
  */
-int pram_read_buf(const char* path, struct fuse_bufvec** bufp, size_t len, off_t off, struct fuse_file_info *fi)
+int pram_read_buf(const char* path, struct fuse_bufvec** bufp, size_t len, off_t off, struct fuse_file_info* fi)
 {
   (void) path;
   struct fuse_bufvec* src = (fuse_bufvec*)malloc(sizeof(struct fuse_bufvec));
@@ -572,6 +585,22 @@ int pram_read_buf(const char* path, struct fuse_bufvec** bufp, size_t len, off_t
   src->buf->pos = off;
   *bufp = src;
   return 0
+}
+
+/**
+ * Close a directory
+ * 
+ * @param   path  The file
+ * @param   fi    File information
+ * @return        Error code
+ */
+int pram_releasedir(const char* path, struct fuse_file_info* fi)
+{
+  (void) path;
+  struct pram_dir_info* di = (struct pram_dir_info*)(uintptr_t)(fi->fh);
+  int err = r(closedir(di->dp));
+  free(di);
+  return err;
 }
 
 
@@ -606,6 +635,7 @@ static struct fuse_operations pram_oper = {
   .read = pram_read,
   .write_buf = pram_write_buf,
   .read_buf = pram_read_buf,
+  .releasedir = pram_releasedir,
   #ifdef HAVE_POSIX_FALLOCATE
     .fallocate = pram_fallocate,
   #endif
@@ -679,7 +709,6 @@ readdir
 utimes  HAVE_UTIMENSAT
 open
 opendir
-releasedir
 create
 what is poll? (used by fsel)
 ioctl (used by fioc)
