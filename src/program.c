@@ -26,9 +26,11 @@
 #include <ulockmgr.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h> /* for memset */
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <dirent.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/file.h>
@@ -563,7 +565,7 @@ int pram_read(const char* path, char* buf, size_t len, off_t off, struct fuse_fi
  * @param    fi    File information
  * @return         Error code if negative, and number of written bytes if non-negative
  */
-int pram_write_buf(const char* path, const char* buf, off_t off, struct fuse_file_info* fi)
+int pram_write_buf(const char* path, struct fuse_bufvec* buf, off_t off, struct fuse_file_info* fi)
 {
   (void) path;
   struct fuse_bufvec dest = FUSE_BUFVEC_INIT(fuse_buf_size(buf));
@@ -586,15 +588,15 @@ int pram_write_buf(const char* path, const char* buf, off_t off, struct fuse_fil
 int pram_read_buf(const char* path, struct fuse_bufvec** bufp, size_t len, off_t off, struct fuse_file_info* fi)
 {
   (void) path;
-  struct fuse_bufvec* src = (fuse_bufvec*)malloc(sizeof(struct fuse_bufvec));
-  if (buf == null)
+  struct fuse_bufvec* src = (struct fuse_bufvec*)malloc(sizeof(struct fuse_bufvec));
+  if (src == null)
     throw ENOMEM;
   *src = FUSE_BUFVEC_INIT(len);
   src->buf->flags = FUSE_BUF_IS_FD | FUSE_BUF_FD_SEEK;
   src->buf->fd = fi->fh;
   src->buf->pos = off;
   *bufp = src;
-  return 0
+  return 0;
 }
 
 /**
@@ -622,18 +624,18 @@ int pram_releasedir(const char* path, struct fuse_file_info* fi)
  */
 int pram_opendir(const char* path, struct fuse_file_info* fi)
 {
-  struct pram_dir_info* di = (pram_dir_info*)malloc(sizeof(struct pram_dir_info));
+  struct pram_dir_info* di = (struct pram_dir_info*)malloc(sizeof(struct pram_dir_info));
   if (di == null)
     throw ENOMEM;
   if ((di->dp = opendir(path)) == null)
     {
       int error = errno;
-      free(d);
+      free(di);
       throw error;
     }
   di->entry = null;
   di->offset = 0;
-  fi->dh = (long)di;
+  fi->fh = (long)di;
   return 0;
 }
 
@@ -654,8 +656,8 @@ int pram_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t off,
   if (off != di->offset)
     {
       seekdir(di->dp, off);
-      d->entry = null;
-      d->offset = off;
+      di->entry = null;
+      di->offset = off;
     }
   for (;;)
     {
