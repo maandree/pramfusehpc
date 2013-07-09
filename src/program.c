@@ -20,17 +20,15 @@
  */
 #include "program.h"
 
-#define bool   long
-#define true   1
-#define false  0
-#define null   0
-#define throw  return -
+#define true     1
+#define false    0
+#define throw    return -
 
 
 /**
  * Buffer for converting a file name in this mountpoint to the one in on the HDD
  */
-static char* pathbuf = null;
+static char* pathbuf = NULL;
 
 /**
  * The length of the HDD path
@@ -56,7 +54,7 @@ static pthread_mutex_t pram_mutex;
  * @param   b  The second comparand
  * @return     The comparands' equality
  */
-static bool eq(char* a, char* b)
+static long eq(char* a, char* b)
 {
   while (*a && *b)
     if (*a++ != *b++)
@@ -84,6 +82,7 @@ char* p(const char* path)
   pathbuf += hddlen;
   for (long i = 0; i < n; i++)
     *(pathbuf + i) = *(path + i);
+  
   return pathbuf -= hddlen;
 }
 
@@ -593,7 +592,7 @@ int pram_read_buf(const char* path, struct fuse_bufvec** bufp, size_t len, off_t
 {
   (void) path;
   struct fuse_bufvec* src = (struct fuse_bufvec*)malloc(sizeof(struct fuse_bufvec));
-  if (src == null)
+  if (src == NULL)
     throw ENOMEM;
   *src = FUSE_BUFVEC_INIT(len);
   src->buf->flags = FUSE_BUF_IS_FD | FUSE_BUF_FD_SEEK;
@@ -629,16 +628,16 @@ int pram_releasedir(const char* path, struct fuse_file_info* fi)
 int pram_opendir(const char* path, struct fuse_file_info* fi)
 {
   struct pram_dir_info* di = (struct pram_dir_info*)malloc(sizeof(struct pram_dir_info));
-  if (di == null)
+  if (di == NULL)
     throw ENOMEM;
   sync_call(di->dp = opendir(p(path)));
-  if (di->dp == null)
+  if (di->dp == NULL)
     {
       int error = errno;
       free(di);
       throw error;
     }
-  di->entry = null;
+  di->entry = NULL;
   di->offset = 0;
   fi->fh = (long)di;
   return 0;
@@ -661,15 +660,15 @@ int pram_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t off,
   if (off != di->offset)
     {
       seekdir(di->dp, off);
-      di->entry = null;
+      di->entry = NULL;
       di->offset = off;
     }
   for (;;)
     {
       struct stat st;
       off_t next_offset;
-      if (di->entry == null)
-	  if ((di->entry = readdir(di->dp)) == null)
+      if (di->entry == NULL)
+	  if ((di->entry = readdir(di->dp)) == NULL)
 	    break;
       memset(&st, 0, sizeof(struct stat));
       st.st_ino = di->entry->d_ino;
@@ -677,7 +676,7 @@ int pram_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t off,
       next_offset = telldir(di->dp);
       if (filler(buf, di->entry->d_name, &st, next_offset))
 	break;
-      di->entry = null;
+      di->entry = NULL;
       di->offset = next_offset;
     }
   return 0;
@@ -803,7 +802,7 @@ static struct fuse_operations pram_oper = {
 /*void* pram_background(void* data)
 {
   (void) data;
-  return null;
+  return NULL;
 }*/
 
 
@@ -817,8 +816,9 @@ static struct fuse_operations pram_oper = {
  */
 int main(int argc, char** argv)
 {
-  char* hdd = null;
-  for (int i = 1; i < argc; i++)
+  int _argc = argc - 2, i;
+  char* hdd = NULL;
+  for (i = 1; i < argc; i++)
     if (eq(*(argv + i), "--hdd"))
       {
 	if ((hdd))
@@ -832,10 +832,13 @@ int main(int argc, char** argv)
 	    return 1;
 	  }
 	else
-	  hdd = argv[++i];
+	  {
+	    hdd = argv[++i];
+	    break;
+	  }
       }
   
-  if (hdd == null)
+  if (hdd == NULL)
     {
       fputs("pramfusehpc: error: --hdd is not specified", stderr);
       return 1;
@@ -844,7 +847,7 @@ int main(int argc, char** argv)
   /* pthread_t background_thread; */
   pthread_attr_t pth_attr;
   
-  if ((errno = pthread_mutex_init(&pram_mutex, null)))
+  if ((errno = pthread_mutex_init(&pram_mutex, NULL)))
     {
       perror("pthread_mutex_init");
       return 1;
@@ -855,28 +858,46 @@ int main(int argc, char** argv)
       return 1;
     }
   /*
-  if ((errno = pthread_create(&background_thread, &pth_attr, pram_background, null)))
+  if ((errno = pthread_create(&background_thread, &pth_attr, pram_background, NULL)))
     {
       perror("pthread_create");
       return 1;
     }
   */
   
+  hdd = realpath(hdd, NULL);
+  if (hdd == NULL)
+    {
+      perror("realpath");
+      return 1;
+    }
   hddlen = 0;
-  for (long i = 0; (*(hdd + i)); i++)
+  for (long j = 0; (*(hdd + j)); j++)
     hddlen++;
   long bufsize = hddlen | (hddlen >> 1);
   for (long s = 1; s < 32; s <<= 1)
     bufsize |= bufsize >> s;
   bufsize += 1;
   pathbuf = (char*)malloc(bufsize * sizeof(char));
-  for (long i = 0; i < hddlen; i++)
-    *(pathbuf + i) = *(hdd + i);
+  for (long j = 0; j < hddlen; j++)
+    *(pathbuf + j) = *(hdd + j);
+  if ((hddlen > 0) && (*(hdd + hddlen - 1) == '/'))
+    hddlen--;
   
-  int rc = fuse_main(argc, argv, &pram_oper, null);
+  i--;
+  char** _argv = (char**)malloc(_argc * sizeof(char*));
+  for (long j = 0, k = 0; j < argc; j++)
+    if (j == i)
+      j++;
+    else
+      *(_argv + k++) = *(argv + j);
+  
+  int rc = fuse_main(_argc, _argv, &pram_oper, NULL);
+  free(hdd);
+  free(_argv);
   free(pathbuf);
   /* pthread_cancel(background_thread); */
-  /* pthread_join(background_thread, null); */
+  /* pthread_join(background_thread, NULL); */
   pthread_mutex_destroy(&pram_mutex);
   return rc;
 }
