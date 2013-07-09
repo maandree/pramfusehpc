@@ -825,7 +825,6 @@ static struct fuse_operations pram_oper = {
 int main(int argc, char** argv)
 {
   char* hdd = null;
-  
   for (int i = 1; i < argc; i++)
     if (eq(*(argv + i), "--hdd"))
       {
@@ -873,8 +872,8 @@ int main(int argc, char** argv)
   hddlen = 0;
   for (long i = 0; (*(hdd + i)); i++)
     hddlen++;
-  long bufsize = hddlen | hddlen >> 1;
-  for (long s = 0; s < 32; s <<= 1)
+  long bufsize = hddlen | (hddlen >> 1);
+  for (long s = 1; s < 32; s <<= 1)
     bufsize |= bufsize >> s;
   bufsize += 1;
   pathbuf = (char*)malloc(bufsize * sizeof(char));
