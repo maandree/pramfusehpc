@@ -20,107 +20,6 @@
  */
 #include "program.h"
 
-#define true     1
-#define false    0
-#define throw    return -
-
-
-/**
- * Buffer for converting a file name in this mountpoint to the one in on the HDD
- */
-static char* pathbuf = NULL;
-
-/**
- * The length of the HDD path
- */
-static long hddlen = 0;
-
-/**
- * The size of `pathbuf`
- */
-static long pathbufsize = 0;
-
-/**
- * Thread mutex
- */
-static pthread_mutex_t pram_mutex;
-
-
-
-/**
- * Compare two NUL-terminated strings against each other
- * 
- * @param   a  The first comparand
- * @param   b  The second comparand
- * @return     The comparands' equality
- */
-static long eq(char* a, char* b)
-{
-  while (*a && *b)
-    if (*a++ != *b++)
-      return false;
-  return !(*a | *b);
-}
-
-
-/**
- * Return a path as it is named on the HDD relative to the root mount path
- * 
- * @param   path  The path in RAM
- * @return        The path on HDD
- */
-char* p(const char* path)
-{
-  long n = 0;
-  while ((*(path + n++)))
-    ;
-  if (n + hddlen > pathbufsize)
-    {
-      pathbufsize = n + hddlen + 128;
-      pathbuf = (char*)realloc(pathbuf, pathbufsize * sizeof(char));
-    }
-  pathbuf += hddlen;
-  for (long i = 0; i < n; i++)
-    *(pathbuf + i) = *(path + i);
-  
-  return pathbuf -= hddlen;
-}
-
-/**
- * Get the value to return for a FUSE operation
- * 
- * @param   rc  The returned value from the native operation
- * @return      `rc`, or the thrown error negative.
- */
-int r(int rc)
-{
-  return rc < 0 ? -errno : rc;
-}
-
-
-/**
- * Perform a synchronised call and return its return value
- * 
- * @param   INSTRUCTION:→int  The instruction
- * @reutrn                    `r(INSTRUCTION)`
- */
-#define sync_return(INSTRUCTION)  	\
-  pthread_mutex_lock(&pram_mutex);	\
-  int rc = INSTRUCTION;			\
-  pthread_mutex_unlock(&pram_mutex);	\
-  return r(rc);
-
-/**
- * Perform a synchronised call
- * 
- * @param  INSTRUCTION:→void  The instruction
- */
-#define sync_call(INSTRUCTION)  	\
-  pthread_mutex_lock(&pram_mutex);	\
-  INSTRUCTION;				\
-  pthread_mutex_unlock(&pram_mutex);
-
-
 
 
 /**
@@ -130,7 +29,7 @@ int r(int rc)
  * @param   mode  The permission bits
  * @return        Error code
  */
-int pram_chmod(const char* path, mode_t mode)
+static int pram_chmod(const char* path, mode_t mode)
 {
   sync_return(chmod(p(path), mode));
 }
@@ -143,7 +42,7 @@ int pram_chmod(const char* path, mode_t mode)
  * @param   group  The group
  * @return         Error code
  */
-int pram_chown(const char* path, uid_t owner, gid_t group)
+static int pram_chown(const char* path, uid_t owner, gid_t group)
 {
   sync_return(lchown(p(path), owner, group));
 }
@@ -155,7 +54,7 @@ int pram_chown(const char* path, uid_t owner, gid_t group)
  * @param   attr  The stat storage
  * @return        Error code
  */
-int pram_getattr(const char* path, struct stat* attr)
+static int pram_getattr(const char* path, struct stat* attr)
 {
   sync_return(lstat(p(path), attr));
 }
@@ -168,13 +67,12 @@ int pram_getattr(const char* path, struct stat* attr)
  * @param   fi    File information
  * @return        Error code
  */
-int pram_fgetattr(const char* path, struct stat* attr, struct fuse_file_info* fi)
+static int pram_fgetattr(const char* path, struct stat* attr, struct fuse_file_info* fi)
 {
   (void) path;
   return r(fstat(fi->fh, attr));
 }
 
-#ifdef HAVE_SETXATTR
 /**
  * Get extended file attributes
  * 
@@ -184,11 +82,10 @@ int pram_fgetattr(const char* path, struct stat* attr, struct fuse_file_info* fi
  * @param   size   The size of `value`
  * @return         Error code or value size
  */
-int pram_getxattr(const char* path, const char* name, char* value, size_t size)
+static int pram_getxattr(const char* path, const char* name, char* value, size_t size)
 {
   sync_return(lgetxattr(p(path), name, value, size));
 }
-#endif
 
 /**
  * Create a hard link to a file
@@ -197,21 +94,11 @@ int pram_getxattr(const char* path, const char* name, char* value, size_t size)
  * @param   path    The link
  * @return          Error code
  */
-int pram_link(const char* target, const char* path)
+static int pram_link(const char* target, const char* path)
 {
-  pthread_mutex_lock(&pram_mutex);
-  char* _target = p(target);
-  pathbuf = (char*)malloc(pathbufsize * sizeof(char));
-  for (int i = 0; i < hddlen; i++)
-    *(pathbuf + i) = *(_target + i);
-  char* _path = p(path);
-  int rc = link(_target, _path);
-  pthread_mutex_unlock(&pram_mutex);
-  free(_target);
-  return r(rc);
+  sync_call_duo_return(link, target, path);
 }
 
-#ifdef HAVE_SETXATTR
 /**
  * List extended file attributes
  * 
@@ -220,11 +107,10 @@ int pram_link(const char* target, const char* path)
  * @param   size   The size of `list`
  * @return         Error code or value size
  */
-int pram_listxattr(const char* path, char* list, size_t size)
+static int pram_listxattr(const char* path, char* list, size_t size)
 {
   sync_return(llistxattr(p(path), list, size));
 }
-#endif
 
 /**
  * Create a directory
@@ -233,7 +119,7 @@ int pram_listxattr(const char* path, char* list, size_t size)
  * @param   mode   The file's protection bits
  * @return         Error code
  */
-int pram_mkdir(const char* path, mode_t mode)
+static int pram_mkdir(const char* path, mode_t mode)
 {
   sync_return(mkdir(p(path), mode));
 }
@@ -246,12 +132,11 @@ int pram_mkdir(const char* path, mode_t mode)
  * @param   rdev   The file's device specifications
  * @return         Error code
  */
-int pram_mknod(const char* path, mode_t mode, dev_t rdev)
+static int pram_mknod(const char* path, mode_t mode, dev_t rdev)
 {
   sync_return(mknod(p(path), mode, rdev));
 }
 
-#ifdef HAVE_SETXATTR
 /**
  * Remove extended file attribute
  * 
@@ -259,11 +144,10 @@ int pram_mknod(const char* path, mode_t mode, dev_t rdev)
  * @param   name  The attribute
  * @return        Error code
  */
-int pram_removexattr(const char* path, const char* name)
+static int pram_removexattr(const char* path, const char* name)
 {
   sync_return(lremovexattr(p(path), name));
 }
-#endif
 
 /**
  * Rename file
@@ -272,16 +156,9 @@ int pram_removexattr(const char* path, const char* name)
  * @param   path    The destination file
  * @return          Error code
  */
-int pram_rename(const char* source, const char* path)
+static int pram_rename(const char* source, const char* path)
 {
-  char* _source = p(source);
-  pathbuf = (char*)malloc(pathbufsize * sizeof(char));
-  for (int i = 0; i < hddlen; i++)
-    *(pathbuf + i) = *(_source + i);
-  char* _path = p(path);
-  int rc = r(rename(_source, _path));
-  free(_source);
-  return rc;
+  sync_call_duo_return(rename, source, path);
 }
 
 /**
@@ -290,12 +167,11 @@ int pram_rename(const char* source, const char* path)
  * @param   path  The file
  * @return        Error code
  */
-int pram_rmdir(const char* path)
+static int pram_rmdir(const char* path)
 {
   sync_return(rmdir(p(path)));
 }
 
-#ifdef HAVE_SETXATTR
 /**
  * Set an extended file attribute
  * 
@@ -306,11 +182,10 @@ int pram_rmdir(const char* path)
  * @param   flags  Rules
  * @return         Error code
  */
-int pram_setxattr(const char* path, const char* name, const char* value, size_t size, int flags)
+static int pram_setxattr(const char* path, const char* name, const char* value, size_t size, int flags)
 {
   sync_return(lsetxattr(p(path), name, value, size, flags));
 }
-#endif
 
 /**
  * Get file system statistics
@@ -319,7 +194,7 @@ int pram_setxattr(const char* path, const char* name, const char* value, size_t 
  * @param   value  The statistics storage
  * @return         Error code
  */
-int pram_statfs(const char* path, struct statvfs* value)
+static int pram_statfs(const char* path, struct statvfs* value)
 {
   sync_return(statvfs(p(path), value));
 }
@@ -331,7 +206,7 @@ int pram_statfs(const char* path, struct statvfs* value)
  * @param   path    The link to create
  * @return          Error code
  */
-int pram_symlink(const char* target, const char* path)
+static int pram_symlink(const char* target, const char* path)
 {
   sync_return(symlink(target, p(path)));
 }
@@ -343,7 +218,7 @@ int pram_symlink(const char* target, const char* path)
  * @param   length  The length
  * @return          Error code
  */
-int pram_truncate(const char* path, off_t length)
+static int pram_truncate(const char* path, off_t length)
 {
   sync_return(truncate(p(path), length));
 }
@@ -356,7 +231,7 @@ int pram_truncate(const char* path, off_t length)
  * @param   fi      File information
  * @return          Error code
  */
-int pram_ftruncate(const char* path, off_t length, struct fuse_file_info* fi)
+static int pram_ftruncate(const char* path, off_t length, struct fuse_file_info* fi)
 {
   (void) path;
   return r(ftruncate(fi->fh, length));
@@ -369,7 +244,7 @@ int pram_ftruncate(const char* path, off_t length, struct fuse_file_info* fi)
  * @param   path  The file
  * @return        Error code
  */
-int pram_unlink(const char* path)
+static int pram_unlink(const char* path)
 {
   sync_return(unlink(p(path)));
 }
@@ -382,7 +257,7 @@ int pram_unlink(const char* path)
  * @param   size    The size of `target`
  * @return          Error code
  */
-int pram_readlink(const char* path, char* target, size_t size)
+static int pram_readlink(const char* path, char* target, size_t size)
 {
   sync_call(long n = readlink(p(path), target, size - 1));
   if (n < 0)
@@ -398,7 +273,7 @@ int pram_readlink(const char* path, char* target, size_t size)
  * @param   mode  The permission to test
  * @return        Error code
  */
-int pram_access(const char* path, int mode)
+static int pram_access(const char* path, int mode)
 {
   sync_return(access(p(path), mode));
 }
@@ -411,7 +286,7 @@ int pram_access(const char* path, int mode)
  * @param   op    The lock operation
  * @return        Error code
  */
-int pram_flock(const char* path, struct fuse_file_info* fi, int op)
+static int pram_flock(const char* path, struct fuse_file_info* fi, int op)
 {
   (void) path;
   return r(flock(fi->fh, op));
@@ -425,19 +300,10 @@ int pram_flock(const char* path, struct fuse_file_info* fi, int op)
  * @param   fi          File information
  * @return              Error code
  */
-int pram_fsync(const char* path, int isdatasync, struct fuse_file_info* fi)
+static int pram_fsync(const char* path, int isdatasync, struct fuse_file_info* fi)
 {
   (void) path;
-  
-  #ifdef HAVE_FDATASYNC
-    if (isdatasync)
-      return r(fdatasync(fi->fh));
-    else
-      return r(fsync(fi->fh));
-  #else
-    (void) isdatasync;
-    return r(fsync(fi->fh));
-  #endif
+  return r(isdatasync ? fdatasync(fi->fh) : fsync(fi->fh));
 }
 
 /**
@@ -448,19 +314,10 @@ int pram_fsync(const char* path, int isdatasync, struct fuse_file_info* fi)
  * @param   fi          File information
  * @return              Error code
  */
-int pram_fsyncdir(const char* path, int isdatasync, struct fuse_file_info* fi)
+static int pram_fsyncdir(const char* path, int isdatasync, struct fuse_file_info* fi)
 {
   (void) path;
-  
-  #ifdef HAVE_FDATASYNC
-    if (isdatasync)
-      return r(fdatasync(fi->fh));
-    else
-      return r(fsync(fi->fh));
-  #else
-    (void) isdatasync;
-    return r(fsync(fi->fh));
-  #endif
+  return r(isdatasync ? fdatasync(fi->fh) : fsync(fi->fh));
 }
 
 /**
@@ -470,7 +327,7 @@ int pram_fsyncdir(const char* path, int isdatasync, struct fuse_file_info* fi)
  * @param   fi    File information
  * @return        Error code
  */
-int pram_release(const char* path, struct fuse_file_info* fi)
+static int pram_release(const char* path, struct fuse_file_info* fi)
 {
   (void) path;
   return r(close(fi->fh));
@@ -486,7 +343,7 @@ int pram_release(const char* path, struct fuse_file_info* fi)
  * @param   fi    File information
  * @return        Error code
  */
-int pram_fallocate(const char* path, int mode, off_t off, off_t len, struct fuse_file_info* fi)
+static int pram_fallocate(const char* path, int mode, off_t off, off_t len, struct fuse_file_info* fi)
 {
   (void) path;
   #ifdef linux
@@ -507,7 +364,7 @@ int pram_fallocate(const char* path, int mode, off_t off, off_t len, struct fuse
  * @param   lock  Lock object
  * @return        Error code
  */
-int pram_lock(const char* path, struct fuse_file_info* fi, int cmd, struct flock* lock)
+static int pram_lock(const char* path, struct fuse_file_info* fi, int cmd, struct flock* lock)
 {
   (void) path;
   return ulockmgr_op(fi->fh, cmd, lock, &(fi->lock_owner), sizeof(fi->lock_owner));
@@ -520,7 +377,7 @@ int pram_lock(const char* path, struct fuse_file_info* fi, int cmd, struct flock
  * @param   fi    File information
  * @return        Error code
  */
-int pram_flush(const char* path, struct fuse_file_info* fi)
+static int pram_flush(const char* path, struct fuse_file_info* fi)
 {
   (void) path;
   /* FILE* is needed for fflush, and there is not flush, so we need to duplicate and close  */
@@ -537,7 +394,7 @@ int pram_flush(const char* path, struct fuse_file_info* fi)
  * @param    fi    File information
  * @return         Error code if negative, and number of written bytes if non-negative
  */
-int pram_write(const char* path, const char* buf, size_t len, off_t off, struct fuse_file_info* fi)
+static int pram_write(const char* path, const char* buf, size_t len, off_t off, struct fuse_file_info* fi)
 {
   (void) path;
   return r(pwrite(fi->fh, buf, len, off));
@@ -553,7 +410,7 @@ int pram_write(const char* path, const char* buf, size_t len, off_t off, struct 
  * @param    fi    File information
  * @return         Error code if negative, and number of read bytes if non-negative
  */
-int pram_read(const char* path, char* buf, size_t len, off_t off, struct fuse_file_info* fi)
+static int pram_read(const char* path, char* buf, size_t len, off_t off, struct fuse_file_info* fi)
 {
   (void) path;
   return r(pread(fi->fh, buf, len, off));
@@ -568,7 +425,7 @@ int pram_read(const char* path, char* buf, size_t len, off_t off, struct fuse_fi
  * @param    fi    File information
  * @return         Error code if negative, and number of written bytes if non-negative
  */
-int pram_write_buf(const char* path, struct fuse_bufvec* buf, off_t off, struct fuse_file_info* fi)
+static int pram_write_buf(const char* path, struct fuse_bufvec* buf, off_t off, struct fuse_file_info* fi)
 {
   (void) path;
   struct fuse_bufvec dest = FUSE_BUFVEC_INIT(fuse_buf_size(buf));
@@ -588,7 +445,7 @@ int pram_write_buf(const char* path, struct fuse_bufvec* buf, off_t off, struct 
  * @param    fi    File information
  * @return         Error code
  */
-int pram_read_buf(const char* path, struct fuse_bufvec** bufp, size_t len, off_t off, struct fuse_file_info* fi)
+static int pram_read_buf(const char* path, struct fuse_bufvec** bufp, size_t len, off_t off, struct fuse_file_info* fi)
 {
   (void) path;
   struct fuse_bufvec* src = (struct fuse_bufvec*)malloc(sizeof(struct fuse_bufvec));
@@ -609,7 +466,7 @@ int pram_read_buf(const char* path, struct fuse_bufvec** bufp, size_t len, off_t
  * @param   fi    File information
  * @return        Error code
  */
-int pram_releasedir(const char* path, struct fuse_file_info* fi)
+static int pram_releasedir(const char* path, struct fuse_file_info* fi)
 {
   (void) path;
   struct pram_dir_info* di = (struct pram_dir_info*)(uintptr_t)(fi->fh);
@@ -625,7 +482,7 @@ int pram_releasedir(const char* path, struct fuse_file_info* fi)
  * @param   fi    File information
  * @return        Error code
  */
-int pram_opendir(const char* path, struct fuse_file_info* fi)
+static int pram_opendir(const char* path, struct fuse_file_info* fi)
 {
   struct pram_dir_info* di = (struct pram_dir_info*)malloc(sizeof(struct pram_dir_info));
   if (di == NULL)
@@ -653,7 +510,7 @@ int pram_opendir(const char* path, struct fuse_file_info* fi)
  * @param   fi      File information
  * @return          Error code
  */
-int pram_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t off, struct fuse_file_info* fi)
+static int pram_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t off, struct fuse_file_info* fi)
 {
   (void) path;
   struct pram_dir_info* di = (struct pram_dir_info*)(uintptr_t)(fi->fh);
@@ -690,7 +547,7 @@ int pram_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t off,
  * @param   fi    File information
  * @return        Error code
  */
-int pram_create(const char* path, mode_t mode, struct fuse_file_info* fi)
+static int pram_create(const char* path, mode_t mode, struct fuse_file_info* fi)
 {
   sync_call(int fd = open(p(path), fi->flags, mode));
   if (fd < 0)
@@ -706,7 +563,7 @@ int pram_create(const char* path, mode_t mode, struct fuse_file_info* fi)
  * @param   fi    File information
  * @return        Error code
  */
-int pram_open(const char* path, struct fuse_file_info* fi)
+static int pram_open(const char* path, struct fuse_file_info* fi)
 {
   sync_call(int fd = open(p(path), fi->flags));
   if (fd < 0)
@@ -715,7 +572,6 @@ int pram_open(const char* path, struct fuse_file_info* fi)
   return 0;
 }
 
-#if HAVE_UTIMENSAT
 /**
  * Update nanosecond precise timestamps
  * 
@@ -723,11 +579,10 @@ int pram_open(const char* path, struct fuse_file_info* fi)
  * @param   ts    Time stamps
  * @return        Error code
  */
-int pram_utimens(const char* path, const struct timespec ts[2])
+static int pram_utimens(const char* path, const struct timespec ts[2])
 {
   sync_return(utimensat(0, p(path), ts, AT_SYMLINK_NOFOLLOW));
 }
-#endif
 
 
 
@@ -768,27 +623,19 @@ static struct fuse_operations pram_oper = {
   .readdir = pram_readdir,
   .create = pram_create,
   .open = pram_open,
-  #ifdef HAVE_POSIX_FALLOCATE
-    .fallocate = pram_fallocate,
-  #endif
-  #ifdef HAVE_SETXATTR
-    .getxattr = pram_getxattr,
-    .listxattr = pram_listxattr,
-    .removexattr = pram_removexattr,
-    .setxattr = pram_setxattr,
-  #endif
-  #if HAVE_UTIMENSAT
-    .utimens = pram_utimens,
-  #endif
+  .fallocate = pram_fallocate,
+  .getxattr = pram_getxattr,
+  .listxattr = pram_listxattr,
+  .removexattr = pram_removexattr,
+  .setxattr = pram_setxattr,
+  .utimens = pram_utimens,
   
   /* Operations with fd does not need path, HOWEVER, unlinked files cannot be accessed. */
   .flag_nullpath_ok = false,
   /* Operations with fd does not need path, and unlinked files cannot be accessed. */
   .flag_nopath = true,
   
-  #if HAVE_UTIMENSAT
-    .flag_utime_omit_ok = true,
-  #endif
+  .flag_utime_omit_ok = true,
 };
 
 
@@ -822,22 +669,16 @@ int main(int argc, char** argv)
     if (eq(*(argv + i), "--hdd"))
       {
 	if ((hdd))
-	  {
-	    fputs("pramfusehpc: error: use of multiple --hdd", stderr);
-	    return 1;
-	  }
+	  fputs("pramfusehpc: error: use of multiple --hdd", stderr);
 	else if (i + 1 == argc)
-	  {
-	    fputs("pramfusehpc: error: --hdd without argument", stderr);
-	    return 1;
-	  }
+	  fputs("pramfusehpc: error: --hdd without argument", stderr);
 	else
 	  {
 	    hdd = argv[++i];
 	    break;
 	  }
+	return 1;
       }
-  
   if (hdd == NULL)
     {
       fputs("pramfusehpc: error: --hdd is not specified", stderr);
@@ -901,6 +742,74 @@ int main(int argc, char** argv)
   pthread_mutex_destroy(&pram_mutex);
   return rc;
 }
+
+
+
+/**
+ * Compare two NUL-terminated strings against each other
+ * 
+ * @param   a  The first comparand
+ * @param   b  The second comparand
+ * @return     The comparands' equality
+ */
+static inline long eq(char* a, char* b)
+{
+  while (*a && *b)
+    if (*a++ != *b++)
+      return false;
+  return !(*a | *b);
+}
+
+/**
+ * Return a path as it is named on the HDD relative to the root mount path
+ * 
+ * @param   path  The path in RAM
+ * @return        The path on HDD
+ */
+static char* p(const char* path)
+{
+  long n = 0;
+  while ((*(path + n++)))
+    ;
+  if (n + hddlen > pathbufsize)
+    {
+      pathbufsize = n + hddlen + 128;
+      pathbuf = (char*)realloc(pathbuf, pathbufsize * sizeof(char));
+    }
+  pathbuf += hddlen;
+  for (long i = 0; i < n; i++)
+    *(pathbuf + i) = *(path + i);
+  return pathbuf -= hddlen;
+}
+
+/**
+ * Return a path as it is named on the HDD relative to the root mount path,
+ * but use a new allocation for the path buffer.
+ * 
+ * @parma   hdd   The old path buffer
+ * @param   path  The path in RAM
+ * @return        The path on HDD
+ */
+static inline char* q(char* hdd, const char* path)
+{
+  pathbuf = (char*)malloc(pathbufsize * sizeof(char));
+  for (int i = 0; i < hddlen; i++)
+    *(pathbuf + i) = *(hdd + i);
+  return p(path);
+}
+
+/**
+ * Get the value to return for a FUSE operation
+ * 
+ * @param   rc  The returned value from the native operation
+ * @return      `rc`, or the thrown error negative.
+ */
+static inline int r(int rc)
+{
+  return rc < 0 ? -errno : rc;
+}
+
+
 
   /*
 ioctl(const char* path, int request, void* arg, struct fuse_file_info* fi, unsigned int flags, void* data)
