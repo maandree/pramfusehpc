@@ -18,26 +18,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifdef HAVE_CONFIG_H
-  #include <config.h>
-#endif
-#define _GNU_SOURCE
-#include <fuse.h>
-#include <ulockmgr.h>
-#include <pthread.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h> /* for memset */
-#include <errno.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <dirent.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/file.h>
-#ifdef HAVE_SETXATTR
-  #include <attr/xattr.h>
-#endif
+#include "program.h"
 
 #define bool   long
 #define true   1
@@ -65,29 +46,6 @@ static long pathbufsize = 0;
  * Thread mutex
  */
 static pthread_mutex_t pram_mutex;
-
-
-
-/**
- * Information for opened directories
- */
-struct pram_dir_info
-{
-  /**
-   * DIR object create when opening the directory
-   */
-  DIR* dp;
-  
-  /**
-   * Read directory information
-   */
-  struct dirent* entry;
-  
-  /**
-   * Offset
-   */
-  off_t offset;
-};
 
 
 
@@ -933,6 +891,8 @@ int main(int argc, char** argv)
 
   /*
 ioctl(const char* path, int request, void* arg, struct fuse_file_info* fi, unsigned int flags, void* data)
+http://fuse.sourceforge.net/doxygen/structfuse__operations.html#a2c02838d30391c09dd5213edc61e106a
+http://fuse.sourceforge.net/doxygen/structfuse__operations.html#a37f0612d67a6b76bf10fe6a71b0e3b5b
 http://fuse.sourceforge.net/doxygen/structfuse__operations.html#ae3f3482e33a0eada0292350d76b82901
 what about fadvice?
 what about readahead?
