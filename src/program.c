@@ -141,6 +141,29 @@ int r(int rc)
 }
 
 
+/**
+ * Perform a synchronised call and return its return value
+ * 
+ * @param   INSTRUCTION:→int  The instruction
+ * @reutrn                    `r(INSTRUCTION)`
+ */
+#define sync_return(INSTRUCTION)  	\
+  pthread_mutex_lock(&pram_mutex);	\
+  int rc = INSTRUCTION;			\
+  pthread_mutex_unlock(&pram_mutex);	\
+  return r(rc);
+
+/**
+ * Perform a synchronised call
+ * 
+ * @param  INSTRUCTION:→void  The instruction
+ */
+#define sync_call(INSTRUCTION)  	\
+  pthread_mutex_lock(&pram_mutex);	\
+  INSTRUCTION;				\
+  pthread_mutex_unlock(&pram_mutex);
+
+
 
 
 /**
@@ -160,7 +183,7 @@ void pram_destroy()
  */
 int pram_chmod(const char* path, mode_t mode)
 {
-  return r(chmod(p(path), mode));
+  sync_return(chmod(p(path), mode));
 }
 
 /**
@@ -173,7 +196,7 @@ int pram_chmod(const char* path, mode_t mode)
  */
 int pram_chown(const char* path, uid_t owner, gid_t group)
 {
-  return r(lchown(p(path), owner, group));
+  sync_return(lchown(p(path), owner, group));
 }
 
 /**
@@ -185,7 +208,7 @@ int pram_chown(const char* path, uid_t owner, gid_t group)
  */
 int pram_getattr(const char* path, struct stat* attr)
 {
-  return r(lstat(p(path), attr));
+  sync_return(lstat(p(path), attr));
 }
 
 /**
@@ -214,7 +237,7 @@ int pram_fgetattr(const char* path, struct stat* attr, struct fuse_file_info* fi
  */
 int pram_getxattr(const char* path, const char* name, char* value, size_t size)
 {
-  return r(lgetxattr(p(path), name, value, size));
+  sync_return(lgetxattr(p(path), name, value, size));
 }
 #endif
 
@@ -227,14 +250,16 @@ int pram_getxattr(const char* path, const char* name, char* value, size_t size)
  */
 int pram_link(const char* target, const char* path)
 {
+  pthread_mutex_lock(&pram_mutex);
   char* _target = p(target);
   pathbuf = (char*)malloc(pathbufsize * sizeof(char));
   for (int i = 0; i < hddlen; i++)
     *(pathbuf + i) = *(_target + i);
   char* _path = p(path);
-  int rc = r(link(_target, _path));
+  int rc = link(_target, _path);
+  pthread_mutex_unlock(&pram_mutex);
   free(_target);
-  return rc;
+  return r(rc);
 }
 
 #ifdef HAVE_SETXATTR
@@ -248,7 +273,7 @@ int pram_link(const char* target, const char* path)
  */
 int pram_listxattr(const char* path, char* list, size_t size)
 {
-  return r(llistxattr(p(path), list, size));
+  sync_return(llistxattr(p(path), list, size));
 }
 #endif
 
@@ -261,7 +286,7 @@ int pram_listxattr(const char* path, char* list, size_t size)
  */
 int pram_mkdir(const char* path, mode_t mode)
 {
-  return r(mkdir(p(path), mode));
+  sync_return(mkdir(p(path), mode));
 }
 
 /**
@@ -274,7 +299,7 @@ int pram_mkdir(const char* path, mode_t mode)
  */
 int pram_mknod(const char* path, mode_t mode, dev_t rdev)
 {
-  return r(mknod(p(path), mode, rdev));
+  sync_return(mknod(p(path), mode, rdev));
 }
 
 #ifdef HAVE_SETXATTR
@@ -287,7 +312,7 @@ int pram_mknod(const char* path, mode_t mode, dev_t rdev)
  */
 int pram_removexattr(const char* path, const char* name)
 {
-  return r(lremovexattr(p(path), name));
+  sync_return(lremovexattr(p(path), name));
 }
 #endif
 
@@ -318,7 +343,7 @@ int pram_rename(const char* source, const char* path)
  */
 int pram_rmdir(const char* path)
 {
-  return r(rmdir(p(path)));
+  sync_return(rmdir(p(path)));
 }
 
 #ifdef HAVE_SETXATTR
@@ -334,7 +359,7 @@ int pram_rmdir(const char* path)
  */
 int pram_setxattr(const char* path, const char* name, const char* value, size_t size, int flags)
 {
-  return r(lsetxattr(p(path), name, value, size, flags));
+  sync_return(lsetxattr(p(path), name, value, size, flags));
 }
 #endif
 
@@ -347,7 +372,7 @@ int pram_setxattr(const char* path, const char* name, const char* value, size_t 
  */
 int pram_statfs(const char* path, struct statvfs* value)
 {
-  return r(statvfs(p(path), value));
+  sync_return(statvfs(p(path), value));
 }
 
 /**
@@ -359,7 +384,7 @@ int pram_statfs(const char* path, struct statvfs* value)
  */
 int pram_symlink(const char* target, const char* path)
 {
-  return r(symlink(target, p(path)));
+  sync_return(symlink(target, p(path)));
 }
 
 /**
@@ -371,7 +396,7 @@ int pram_symlink(const char* target, const char* path)
  */
 int pram_truncate(const char* path, off_t length)
 {
-  return r(truncate(p(path), length));
+  sync_return(truncate(p(path), length));
 }
 
 /**
@@ -397,7 +422,7 @@ int pram_ftruncate(const char* path, off_t length, struct fuse_file_info* fi)
  */
 int pram_unlink(const char* path)
 {
-  return r(unlink(p(path)));
+  sync_return(unlink(p(path)));
 }
 
 /**
@@ -410,7 +435,7 @@ int pram_unlink(const char* path)
  */
 int pram_readlink(const char* path, char* target, size_t size)
 {
-  long n = readlink(p(path), target, size - 1);
+  sync_call(long n = readlink(p(path), target, size - 1));
   if (n < 0)
     throw errno;
   *(target + n) = 0;
@@ -426,7 +451,7 @@ int pram_readlink(const char* path, char* target, size_t size)
  */
 int pram_access(const char* path, int mode)
 {
-  return r(access(p(path), mode));
+  sync_return(access(p(path), mode));
 }
 
 /**
@@ -633,7 +658,8 @@ int pram_opendir(const char* path, struct fuse_file_info* fi)
   struct pram_dir_info* di = (struct pram_dir_info*)malloc(sizeof(struct pram_dir_info));
   if (di == null)
     throw ENOMEM;
-  if ((di->dp = opendir(path)) == null)
+  sync_call(di->dp = opendir(p(path)));
+  if (di->dp == null)
     {
       int error = errno;
       free(di);
@@ -694,7 +720,7 @@ int pram_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t off,
  */
 int pram_create(const char* path, mode_t mode, struct fuse_file_info* fi)
 {
-  int fd = open(path, fi->flags, mode);
+  sync_call(int fd = open(p(path), fi->flags, mode));
   if (fd < 0)
     throw fd;
   fi->fh = fd;
@@ -710,7 +736,7 @@ int pram_create(const char* path, mode_t mode, struct fuse_file_info* fi)
  */
 int pram_open(const char* path, struct fuse_file_info* fi)
 {
-  int fd = open(path, fi->flags);
+  sync_call(int fd = open(p(path), fi->flags));
   if (fd < 0)
     throw fd;
   fi->fh = fd;
@@ -727,7 +753,7 @@ int pram_open(const char* path, struct fuse_file_info* fi)
  */
 int pram_utimens(const char* path, const struct timespec ts[2])
 {
-  return r(utimensat(0, p(path), ts, AT_SYMLINK_NOFOLLOW));
+  sync_return(utimensat(0, p(path), ts, AT_SYMLINK_NOFOLLOW));
 }
 #endif
 
