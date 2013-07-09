@@ -492,6 +492,29 @@ int pram_fsync(const char* path, int isdatasync, struct fuse_file_info* fi)
 }
 
 /**
+ * Synchronize changes to a directory to the underlaying storage device
+ * 
+ * @param   path        The file
+ * @param   isdatasync  Whether to use `fdatasyncdir` rather than `fsyncdir` if available
+ * @param   fi          File information
+ * @return              Error code
+ */
+int pram_fsyncdir(const char* path, int isdatasync, struct fuse_file_info* fi)
+{
+  (void) path;
+  
+  #ifdef HAVE_FDATASYNC
+    if (isdatasync)
+      return r(fdatasync(fi->fh));
+    else
+      return r(fsync(fi->fh));
+  #else
+    (void) isdatasync;
+    return r(fsync(fi->fh));
+  #endif
+}
+
+/**
  * Close an open file
  * 
  * @param   path  The file
@@ -782,6 +805,7 @@ static struct fuse_operations pram_oper = {
   .access = pram_access,
   .flock = pram_flock,
   .fsync = pram_fsync,
+  .fsyncdir = pram_fsyncdir,
   .release = pram_release,
   .lock = pram_lock,
   .flush = pram_flush,
