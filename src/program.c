@@ -630,6 +630,11 @@ static struct fuse_operations pram_oper = {
   .setxattr = pram_setxattr,
   .utimens = pram_utimens,
   
+  /*
+    what about fadvice?
+    what about readahead?
+  */
+  
   /* Operations with fd does not need path, HOWEVER, unlinked files cannot be accessed. */
   .flag_nullpath_ok = false,
   /* Operations with fd does not need path, and unlinked files cannot be accessed. */
@@ -837,11 +842,3 @@ int get_user_info(uid_t* user, gid_t* group, mode_t* umask, pid_t* process, gid_
   return ret == -ENOSYS ? 0 : ret;
 }
 
-
-
-/*
-http://fuse.sourceforge.net/doxygen/structfuse__operations.html#a2c02838d30391c09dd5213edc61e106a
-http://fuse.sourceforge.net/doxygen/structfuse__operations.html#a37f0612d67a6b76bf10fe6a71b0e3b5b
-what about fadvice?
-what about readahead?
-*/
