@@ -125,14 +125,6 @@ int r(int rc)
 
 
 /**
- * Clean up the file system for exit
- */
-void pram_destroy()
-{
-  free(pathbuf);
-}
-
-/**
  * Change the permission bits of a file
  * 
  * @param   path  The file
@@ -744,7 +736,8 @@ int pram_utimens(const char* path, const struct timespec ts[2])
  * The file system operations
  */
 static struct fuse_operations pram_oper = {
-  .destroy = pram_destroy,
+  /* .destroy = pram_destroy,  :  void() // Clean up the file system for exit */
+  /* .init = pram_init,  :  void*(struct fuse_conn_info *conn) // Initialise filesystem */
   .chmod = pram_chmod,
   .chown = pram_chown,
   .getattr = pram_getattr,
