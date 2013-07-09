@@ -807,7 +807,11 @@ static struct fuse_operations pram_oper = {
     .utimens = pram_utimens,
   #endif
   
-  .flag_nullpath_ok = true, /* TODO should this be true or false? */
+  /* Operations with fd does not need path, HOWEVER, unlinked files cannot be accessed. */
+  .flag_nullpath_ok = false,
+  /* Operations with fd does not need path, and unlinked files cannot be accessed. */
+  .flag_nopath = true,
+  
   #if HAVE_UTIMENSAT
     .flag_utime_omit_ok = true,
   #endif
