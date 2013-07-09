@@ -871,6 +871,7 @@ int main(int argc, char** argv)
   
   int rc = fuse_main(argc, argv, &pram_oper, null);
   free(pathbuf);
+  pthread_mutex_destroy(&pram_mutex);
   /* pthread_cancel(background_thread); */
   /* pthread_join(background_thread, null); */
   return rc;
