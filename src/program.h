@@ -90,6 +90,23 @@ struct pram_dir_info
 };
 
 
+/**
+ * Information for cached files
+ */
+struct pram_file_info
+{
+  /**
+   * Contains information such as for example proctection, inode number and ownership
+   */
+  struct stat attr;
+  
+  /**
+   * File description
+   */
+  uint64_t fd;
+};
+
+
 
 /**
  * Lock mutex
