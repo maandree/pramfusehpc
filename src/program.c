@@ -811,13 +811,37 @@ static inline int r(int rc)
 
 
 
-  /*
-ioctl(const char* path, int request, void* arg, struct fuse_file_info* fi, unsigned int flags, void* data)
+/**
+ * Get information about the use as well as the ID of the process accessing the file system
+ * 
+ * @param   user          Where to store the ID of the user accessing the file system
+ * @param   group         Where to store the group ID of the user accessing the file system
+ * @param   umask         Where to store the current umask
+ * @param   process       Where to store the ID of the process accessing the file system
+ * @param   supplemental  List to fill with supplemental groups of the user accessing the file system, ignored if `NULL`
+ * @param   n             The size of `supplemental`
+ * @return                Error code or the total (can exceed `supplemental`) number of supplemental groups
+ */
+int get_user_info(uid_t* user, gid_t* group, mode_t* umask, pid_t* process, gid_t* supplemental, int n)
+{
+  struct fuse_context* context = fuse_get_context();
+  *user = context->uid;
+  *group = context->gid;
+  *umask = context->umask;
+  *process = context->pid;
+  
+  if (supplemental == NULL)
+    return 0;
+  
+  int ret = fuse_getgroups(n, supplemental);
+  return ret == -ENOSYS ? 0 : ret;
+}
+
+
+
+/*
 http://fuse.sourceforge.net/doxygen/structfuse__operations.html#a2c02838d30391c09dd5213edc61e106a
 http://fuse.sourceforge.net/doxygen/structfuse__operations.html#a37f0612d67a6b76bf10fe6a71b0e3b5b
-http://fuse.sourceforge.net/doxygen/structfuse__operations.html#ae3f3482e33a0eada0292350d76b82901
 what about fadvice?
 what about readahead?
-
-what is poll? (used by fsel)
-   */
+*/

@@ -175,3 +175,18 @@ static inline char* q(char* hdd, const char* path);
  */
 static inline int r(int rc);
 
+
+
+/**
+ * Get information about the use as well as the ID of the process accessing the file system
+ * 
+ * @param   user          Where to store the ID of the user accessing the file system
+ * @param   group         Where to store the group ID of the user accessing the file system
+ * @param   umask         Where to store the current umask
+ * @param   process       Where to store the ID of the process accessing the file system
+ * @param   supplemental  List to fill with supplemental groups of the user accessing the file system, ignored if `NULL`
+ * @param   n             The size of `supplemental`
+ * @return                Error code or the total (can exceed `supplemental`) number of supplemental groups
+ */
+int get_user_info(uid_t* user, gid_t* group, mode_t* umask, pid_t* process, gid_t* supplemental, int n);
+
