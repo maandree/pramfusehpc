@@ -123,6 +123,16 @@ struct pram_file
    * Contains information such as for example proctection, inode number and ownership
    */
   struct stat attr;
+  
+  /**
+   * Allocated space for the buffer, −1 for unallocated
+   */
+  unsigned long allocated;
+  
+  /**
+   * The buffer
+   */
+  char* buffer;
 };
 
 

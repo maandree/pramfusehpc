@@ -997,6 +997,8 @@ int get_file_cache(const char* path, struct pram_file** cache)
       struct pram_file* c = (struct pram_file*)malloc(sizeof(struct pram_file));
       memset(c, 0, sizeof(struct pram_file));
       (*cache = c)->attr = attr;
+      c->buffer = NULL;
+      c->allocated = -1;
       pram_map_put(pram_file_cache, path, c);
     }
   else
