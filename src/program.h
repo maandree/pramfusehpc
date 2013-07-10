@@ -68,6 +68,11 @@ static long pathbufsize = 0;
  */
 static pthread_mutex_t pram_mutex;
 
+/**
+ * File cache map
+ */
+static pram_map* pram_file_cache;
+
 
 
 /**

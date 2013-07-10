@@ -62,7 +62,8 @@ typedef struct
   long key_count;
   
   /**
-   * Indefinite depth array with 16 or 17 elements per level, the last being the value at the position. The first level has 17 elements and the levels alternates between 16 and 17 elements.
+   * Indefinite depth array with with some levels (depends on MAP_LB_LEVELS),
+   * including the firstk having a value at last position.
    */
   void** data;
 } pram_map;
@@ -91,7 +92,7 @@ long pram_map_values_size;
  * 
  * @param  map  The address of the map
  */
-void map_init(pram_map* map);
+void pram_map_init(pram_map* map);
 
 /**
  * Gets the value for a key in a map
@@ -100,7 +101,7 @@ void map_init(pram_map* map);
  * @param   key  The key
  * @return       The value, `NULL` if not found
  */
-void* map_get(pram_map* map, const char* key);
+void* pram_map_get(pram_map* map, const char* key);
 
 /**
  * Sets the value for a key in a map
@@ -109,7 +110,7 @@ void* map_get(pram_map* map, const char* key);
  * @param  key    The key
  * @param  value  The value, `NULL` to remove, however this does not unlist the key
  */
-void map_put(pram_map* map, const char* key, void* value);
+void pram_map_put(pram_map* map, const char* key, void* value);
 
 /**
  * Frees the resources of a map
@@ -118,5 +119,5 @@ void map_put(pram_map* map, const char* key, void* value);
  * @return       `NULL`-terminated array of values that you may want to free,
  *               but do free this returend array before running this function again
  */
-void** map_free(pram_map* map);
+void** pram_map_free(pram_map* map);
 

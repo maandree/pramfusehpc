@@ -738,10 +738,15 @@ int main(int argc, char** argv)
     else
       *(_argv + k++) = *(argv + j);
   
+  pram_file_cache = (pram_map*)malloc(sizeof(pram_map));
+  pram_map_init(pram_file_cache);
+  
   int rc = fuse_main(_argc, _argv, &pram_oper, NULL);
   free(hdd);
   free(_argv);
   free(pathbuf);
+  free(pram_map_free(pram_file_cache));
+  free(pram_file_cache);
   /* pthread_cancel(background_thread); */
   /* pthread_join(background_thread, NULL); */
   pthread_mutex_destroy(&pram_mutex);
