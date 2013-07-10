@@ -22,12 +22,6 @@
 
 
 
-/** Auxiliary syntax **/
-#define true     1
-#define false    0
-
-
-
 /**
  * Initialises a map
  * 
@@ -37,8 +31,6 @@ void pram_map_init(pram_map* map)
 {
   long i;
   void** level;
-  map->keys = NULL;
-  map->key_count = 0;
   map->data = level = (void**)malloc((MAP_PER_LEVEL + 1) * sizeof(void*));
   for (i = 0; i <= MAP_PER_LEVEL; i++)
     *(level + i) = NULL;
@@ -86,11 +78,10 @@ void* pram_map_get(pram_map* map, const char* key)
  * 
  * @param  map    The address of the map
  * @param  key    The key
- * @param  value  The value, `NULL` to remove, however this does not unlist the key
+ * @param  value  The value, `NULL` to remove
  */
 void pram_map_put(pram_map* map, const char* key, void* value)
 {
-  long new = false;
   void** at = map->data;
   long i, lv;
   while (*key)
@@ -104,7 +95,6 @@ void pram_map_put(pram_map* map, const char* key, void* value)
 	    at = (void**)(*(at + lv) = (void*)malloc((MAP_PER_LEVEL + (END)) * sizeof(void*)));		\
 	    for (i = 0; i < MAP_PER_LEVEL + (END); i++)							\
 	      *(at + i) = NULL;										\
-	    new = true;											\
 	  }
       __(0, MAP_LB_LEVELS == 0);
       #if MAP_LB_LEVELS >= 1
@@ -120,8 +110,6 @@ void pram_map_put(pram_map* map, const char* key, void* value)
       key++;
     }
   *(at + MAP_PER_LEVEL) = value;
-  if (new)
-    map->keys = (char**)realloc(map->keys, (map->key_count + 1) * sizeof(char*));
 }
 
 
@@ -159,10 +147,6 @@ static void pram__map_free(void** level, long level_depth)
  */
 void** pram_map_free(pram_map* map)
 {
-  if (map->keys != NULL)
-    free(map->keys);
-  map->keys = NULL;
-  
   pram_map_values_ptr = 0;
   pram_map_values_size = 64;
   pram_map_values = (void**)malloc(512 * sizeof(void*));

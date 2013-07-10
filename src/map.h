@@ -52,16 +52,6 @@
 typedef struct
 {
   /**
-   * Available keys
-   */
-  char** keys;
-  
-  /**
-   * The number of available keys
-   */
-  long key_count;
-  
-  /**
    * Indefinite depth array with with some levels (depends on MAP_LB_LEVELS),
    * including the firstk having a value at last position.
    */
@@ -108,7 +98,7 @@ void* pram_map_get(pram_map* map, const char* key);
  * 
  * @param  map    The address of the map
  * @param  key    The key
- * @param  value  The value, `NULL` to remove, however this does not unlist the key
+ * @param  value  The value, `NULL` to remove
  */
 void pram_map_put(pram_map* map, const char* key, void* value);
 
