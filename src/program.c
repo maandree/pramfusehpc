@@ -19,6 +19,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "program.h"
+/* TODO update atime */
 
 
 
@@ -39,6 +40,7 @@ static int pram_chmod(const char* path, mode_t mode)
       {
 	error = chmod(pathbuf, mode);
 	cache->attr.st_mode = mode;
+	/* TODO update ctime */
       }
   _unlock;
   return error;
@@ -63,6 +65,7 @@ static int pram_chown(const char* path, uid_t owner, gid_t group)
 	error = lchown(pathbuf, owner, group);
 	cache->attr.st_uid = owner;
 	cache->attr.st_gid = group;
+	/* TODO update ctime */
       }
   _unlock;
   return error;
@@ -178,6 +181,7 @@ static int pram_mknod(const char* path, mode_t mode, dev_t rdev)
 static int pram_removexattr(const char* path, const char* name)
 {
   sync_return(lremovexattr(p(path), name));  /* TODO xattr is not cached */
+  /* TODO update ctime */
 }
 
 /**
@@ -197,6 +201,7 @@ static int pram_rename(const char* source, const char* path)
       {
 	pram_map_put(pram_file_cache, path, pram_map_get(pram_file_cache, source));
 	pram_map_put(pram_file_cache, source, NULL);
+	/* TODO update ctime */
       }
   _unlock;
   free(_source);
@@ -227,6 +232,7 @@ static int pram_rmdir(const char* path)
 static int pram_setxattr(const char* path, const char* name, const char* value, size_t size, int flags)
 {
   sync_return(lsetxattr(p(path), name, value, size, flags));  /* TODO xattr is not cached */
+  /* TODO update ctime */
 }
 
 /**
@@ -262,8 +268,26 @@ static int pram_symlink(const char* target, const char* path)
  */
 static int pram_truncate(const char* path, off_t length)
 {
-  /* TODO */
-  sync_return(truncate(p(path), length));
+  _lock;
+  struct pram_file* cache;
+  int error = get_file_cache(path, &cache);
+  if (!error)
+    if (!(error = truncate(pathbuf, length)))
+      {
+	off_t size = cache->attr.st_size;
+	blkcnt_t blocks = cache->attr.st_blocks;
+	size += (!!(size & 511)) << 9;
+	blocks -= size >> 9;
+	size = length;
+	size += (!!(size & 511)) << 9;
+	blocks += size >> 9;
+	cache->attr.st_size = length;
+	cache->attr.st_blocks = blocks;
+	/* TODO update ctime */
+	/* TODO update mtime */
+      }
+  _unlock;
+  return r(error);
 }
 
 /**
@@ -276,9 +300,36 @@ static int pram_truncate(const char* path, off_t length)
  */
 static int pram_ftruncate(const char* path, off_t length, struct fuse_file_info* fi)
 {
-  /* TODO */
   (void) path;
-  return r(ftruncate(fi->fh, length));
+  struct pram_file_info* file = (struct pram_file_info*)(uintptr_t)(fi->fh);
+  int error = ftruncate(file->fd, length);
+  if (!error)
+    {
+      struct pram_file* cache = file->cache;
+      off_t size = cache->attr.st_size;
+      off_t addition = size >= length ? 0 : (length - size);
+      blkcnt_t blocks = cache->attr.st_blocks;
+      size += (!!(size & 511)) << 9;
+      blocks -= size >> 9;
+      size = length;
+      size += (!!(size & 511)) << 9;
+      blocks += size >> 9;
+      _lock;
+      cache->attr.st_size = length;
+      cache->attr.st_blocks = blocks;
+      if ((addition > 0) && cache->allocated)
+	{
+	  off_t off = length - addition;
+	  off_t end = (unsigned long)length < cache->allocated ? (unsigned long)length : cache->allocated;
+	  char* buf = cache->buffer;
+	  for (; off < end; off++)
+	    *(buf + off) = 0;
+	}
+      _unlock;
+      /* TODO update ctime */
+      /* TODO update mtime */
+    }
+  return r(error);
 }
 
 /**
@@ -876,11 +927,11 @@ int main(int argc, char** argv)
   free(hdd);
   free(_argv);
   free(pathbuf);
-  struct pram_file** file_caches = pram_map_free(pram_file_cache);
+  struct pram_file** file_caches = (struct pram_file**)pram_map_free(pram_file_cache);
   struct pram_file* file_cache;
   while ((file_cache = *file_caches++))
     {
-      free(file_cache->buffer)
+      free(file_cache->buffer);
       free(file_cache);
     }
   free(file_caches);
@@ -1006,7 +1057,7 @@ int get_file_cache(const char* path, struct pram_file** cache)
       memset(c, 0, sizeof(struct pram_file));
       (*cache = c)->attr = attr;
       c->buffer = NULL;
-      c->allocated = -1;
+      c->allocated = 0;
       pram_map_put(pram_file_cache, path, c);
     }
   else

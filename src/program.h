@@ -125,7 +125,7 @@ struct pram_file
   struct stat attr;
   
   /**
-   * Allocated space for the buffer, −1 for unallocated
+   * Allocated space for the buffer, 0 for unallocated
    */
   unsigned long allocated;
   
