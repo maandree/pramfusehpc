@@ -449,7 +449,6 @@ static int pram_release(const char* path, struct fuse_file_info* fi)
   pram_flush(path, fi);
   struct pram_file_info* file = (struct pram_file_info*)(uintptr_t)(fi->fh);
   int rc = close(file->fd);
-  free(file->cache);
   free(file);
   return r(rc);
 }
