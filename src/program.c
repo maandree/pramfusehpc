@@ -97,7 +97,9 @@ static int pram_getattr(const char* path, struct stat* attr)
 static int pram_fgetattr(const char* path, struct stat* attr, struct fuse_file_info* fi)
 {
   (void) path;
+  _lock;
   *attr = ((struct pram_file*)(void*)(fi->fh))->cache->attr;
+  _unlock;
   return 0;
 }
 
@@ -112,8 +114,7 @@ static int pram_fgetattr(const char* path, struct stat* attr, struct fuse_file_i
  */
 static int pram_getxattr(const char* path, const char* name, char* value, size_t size)
 {
-  /* TODO this is not cached */
-  sync_return(lgetxattr(p(path), name, value, size));
+  sync_return(lgetxattr(p(path), name, value, size));  /* TODO this is not cached */
 }
 
 /**
@@ -139,8 +140,7 @@ static int pram_link(const char* target, const char* path)
  */
 static int pram_listxattr(const char* path, char* list, size_t size)
 {
-  /* TODO this is not cached */
-  sync_return(llistxattr(p(path), list, size));
+  sync_return(llistxattr(p(path), list, size));  /* TODO this is not cached */
 }
 
 /**
@@ -152,6 +152,7 @@ static int pram_listxattr(const char* path, char* list, size_t size)
  */
 static int pram_mkdir(const char* path, mode_t mode)
 {
+  /* TODO */
   sync_return(mkdir(p(path), mode));
 }
 
@@ -177,8 +178,7 @@ static int pram_mknod(const char* path, mode_t mode, dev_t rdev)
  */
 static int pram_removexattr(const char* path, const char* name)
 {
-  /* TODO this is not cached */
-  sync_return(lremovexattr(p(path), name));
+  sync_return(lremovexattr(p(path), name));  /* TODO this is not cached */
 }
 
 /**
@@ -227,8 +227,7 @@ static int pram_rmdir(const char* path)
  */
 static int pram_setxattr(const char* path, const char* name, const char* value, size_t size, int flags)
 {
-  /* TODO this is not cached */
-  sync_return(lsetxattr(p(path), name, value, size, flags));
+  sync_return(lsetxattr(p(path), name, value, size, flags));  /* TODO this is not cached */
 }
 
 /**
@@ -293,8 +292,21 @@ static int pram_ftruncate(const char* path, off_t length, struct fuse_file_info*
  */
 static int pram_unlink(const char* path)
 {
-  /* TODO */
-  sync_return(unlink(p(path)));
+  _lock;
+  void* ret = pram_map_get(pram_file_cache, path);
+  if (ret != NULL)
+    {
+      struct pram_file* cache = (struct pram_file*)ret;
+      cache->attr.st_nlink--;
+      if (cache->attr.st_nlink == 0)
+	{
+	  free(cache);
+	  pram_map_put(pram_file_cache, NULL);
+	}
+    }
+  int rc = unlink(p(path));
+  _unlock;
+  return r(rc);
 }
 
 /**
@@ -529,7 +541,7 @@ static int pram_read_buf(const char* path, struct fuse_bufvec** bufp, size_t len
  */
 static int pram_releasedir(const char* path, struct fuse_file_info* fi)
 {
-  /* TODO */
+  /* TODO this is not cached */
   (void) path;
   struct pram_dir_info* di = (struct pram_dir_info*)(uintptr_t)(fi->fh);
   int err = r(closedir(di->dp));
@@ -546,7 +558,7 @@ static int pram_releasedir(const char* path, struct fuse_file_info* fi)
  */
 static int pram_opendir(const char* path, struct fuse_file_info* fi)
 {
-  /* TODO */
+  /* TODO this is not cached */
   struct pram_dir_info* di = (struct pram_dir_info*)malloc(sizeof(struct pram_dir_info));
   if (di == NULL)
     throw ENOMEM;
@@ -647,8 +659,27 @@ static int pram_open(const char* path, struct fuse_file_info* fi)
  */
 static int pram_utimens(const char* path, const struct timespec ts[2])
 {
-  /* TODO */
-  sync_return(utimensat(0, p(path), ts, AT_SYMLINK_NOFOLLOW));
+  _lock;
+  struct pram_file* cache = NULL;
+  int error = get_file_cache(path, &cache);
+  if (!error)
+    if (!(error = utimensat(0, pathbuf, ts, AT_SYMLINK_NOFOLLOW)))
+      {
+	if (ts == NULL)
+	  {
+	    struct stat attr;
+	    error = lstat(p(path), &attr);
+	    if (!error)
+	      cache->attr = attr;
+	  }
+	else
+	  {
+	    cache->attr.atim = ts[0];
+	    cache->attr.mtim = ts[1];
+	  }
+      }
+  _unlock;
+  return r(error);
 }
 
 
