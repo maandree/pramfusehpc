@@ -275,6 +275,7 @@ static int pram_truncate(const char* path, off_t length)
     if (!(error = truncate(pathbuf, length)))
       {
 	off_t size = cache->attr.st_size;
+	off_t addition = size >= length ? 0 : (length - size);
 	blkcnt_t blocks = cache->attr.st_blocks;
 	size += (!!(size & 511)) << 9;
 	blocks -= size >> 9;
@@ -283,6 +284,27 @@ static int pram_truncate(const char* path, off_t length)
 	blocks += size >> 9;
 	cache->attr.st_size = length;
 	cache->attr.st_blocks = blocks;
+	if (cache->allocated)
+	  {
+	    if (addition > 0)
+	      {
+		off_t off = length - addition;
+		off_t end = (unsigned long)length < cache->allocated ? (unsigned long)length : cache->allocated;
+		char* buf = cache->buffer;
+		for (; off < end; off++)
+		  *(buf + off) = 0;
+	      }
+	    else if (length == 0)
+	      {
+		cache->allocated = 0;
+		free(cache->buffer);
+	      }
+	    else if (cache->allocated >= (unsigned long)(length << 1))
+	      {
+		cache->allocated = length;
+		cache->buffer = (char*)realloc(cache->buffer, length * sizeof(char));
+	      }
+	  }
 	/* TODO update ctime */
 	/* TODO update mtime */
       }
@@ -317,13 +339,26 @@ static int pram_ftruncate(const char* path, off_t length, struct fuse_file_info*
       _lock;
       cache->attr.st_size = length;
       cache->attr.st_blocks = blocks;
-      if ((addition > 0) && cache->allocated)
+      if (cache->allocated)
 	{
-	  off_t off = length - addition;
-	  off_t end = (unsigned long)length < cache->allocated ? (unsigned long)length : cache->allocated;
-	  char* buf = cache->buffer;
-	  for (; off < end; off++)
-	    *(buf + off) = 0;
+	  if (addition > 0)
+	    {
+	      off_t off = length - addition;
+	      off_t end = (unsigned long)length < cache->allocated ? (unsigned long)length : cache->allocated;
+	      char* buf = cache->buffer;
+	      for (; off < end; off++)
+		*(buf + off) = 0;
+	    }
+	  else if (length == 0)
+	    {
+	      cache->allocated = 0;
+	      free(cache->buffer);
+	    }
+	  else if (cache->allocated >= (unsigned long)(length << 1))
+	    {
+	      cache->allocated = length;
+	      cache->buffer = (char*)realloc(cache->buffer, length * sizeof(char));
+	    }
 	}
       _unlock;
       /* TODO update ctime */
