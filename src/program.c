@@ -34,13 +34,12 @@ static int pram_chmod(const char* path, mode_t mode)
   struct pram_file* cache = NULL;
   _lock;
   int error = get_file_cache(path, &cache);
-  if (error)
-    return error;
-  if (cache->attr.st_mode != mode)
-    {
-      error = chmod(pathbuf, mode);
-      cache->attr.st_mode = mode;
-    }
+  if (!error)
+    if (cache->attr.st_mode != mode)
+      {
+	error = chmod(pathbuf, mode);
+	cache->attr.st_mode = mode;
+      }
   _unlock;
   return error;
 }
@@ -55,7 +54,18 @@ static int pram_chmod(const char* path, mode_t mode)
  */
 static int pram_chown(const char* path, uid_t owner, gid_t group)
 {
-  sync_return(lchown(p(path), owner, group));
+  struct pram_file* cache = NULL;
+  _lock;
+  int error = get_file_cache(path, &cache);
+  if (!error)
+    if ((cache->attr.st_uid != owner) || (cache->attr.st_gid != group))
+      {
+	error = lchown(pathbuf, owner, group);
+	cache->attr.st_uid = owner;
+	cache->attr.st_gid = group;
+      }
+  _unlock;
+  return error;
 }
 
 /**
@@ -67,7 +77,13 @@ static int pram_chown(const char* path, uid_t owner, gid_t group)
  */
 static int pram_getattr(const char* path, struct stat* attr)
 {
-  sync_return(lstat(p(path), attr));
+  struct pram_file* cache = NULL;
+  _lock;
+  int error = get_file_cache(path, &cache);
+  if (!error)
+    *attr = cache->attr;
+  _unlock;
+  return error;
 }
 
 /**
@@ -81,7 +97,8 @@ static int pram_getattr(const char* path, struct stat* attr)
 static int pram_fgetattr(const char* path, struct stat* attr, struct fuse_file_info* fi)
 {
   (void) path;
-  return r(fstat(fi->fh, attr));
+  *attr = ((struct pram_file*)(void*)(fi->fh))->cache->attr;
+  return 0;
 }
 
 /**
@@ -95,6 +112,7 @@ static int pram_fgetattr(const char* path, struct stat* attr, struct fuse_file_i
  */
 static int pram_getxattr(const char* path, const char* name, char* value, size_t size)
 {
+  /* TODO this is not cached */
   sync_return(lgetxattr(p(path), name, value, size));
 }
 
@@ -107,6 +125,7 @@ static int pram_getxattr(const char* path, const char* name, char* value, size_t
  */
 static int pram_link(const char* target, const char* path)
 {
+  /* TODO hard linking is currently a problem for our cache */
   sync_call_duo_return(link, target, path);
 }
 
@@ -120,6 +139,7 @@ static int pram_link(const char* target, const char* path)
  */
 static int pram_listxattr(const char* path, char* list, size_t size)
 {
+  /* TODO this is not cached */
   sync_return(llistxattr(p(path), list, size));
 }
 
@@ -157,6 +177,7 @@ static int pram_mknod(const char* path, mode_t mode, dev_t rdev)
  */
 static int pram_removexattr(const char* path, const char* name)
 {
+  /* TODO this is not cached */
   sync_return(lremovexattr(p(path), name));
 }
 
@@ -169,7 +190,17 @@ static int pram_removexattr(const char* path, const char* name)
  */
 static int pram_rename(const char* source, const char* path)
 {
-  sync_call_duo_return(rename, source, path);
+  _lock;
+  char* _source = p(source);
+  int error = rename(_source, q(_source, path));
+  if (!error)
+    {
+      pram_map_put(pram_file_cache, path, pram_map_get(pram_file_cache, source));
+      pram_map_put(pram_file_cache, source, NULL);
+    }
+  _unlunk;
+  free(_source);
+  return r(rc);
 }
 
 /**
@@ -180,6 +211,7 @@ static int pram_rename(const char* source, const char* path)
  */
 static int pram_rmdir(const char* path)
 {
+  /* TODO this is not cached */
   sync_return(rmdir(p(path)));
 }
 
@@ -195,6 +227,7 @@ static int pram_rmdir(const char* path)
  */
 static int pram_setxattr(const char* path, const char* name, const char* value, size_t size, int flags)
 {
+  /* TODO this is not cached */
   sync_return(lsetxattr(p(path), name, value, size, flags));
 }
 
@@ -207,6 +240,7 @@ static int pram_setxattr(const char* path, const char* name, const char* value, 
  */
 static int pram_statfs(const char* path, struct statvfs* value)
 {
+  /* TODO this is not cached */
   sync_return(statvfs(p(path), value));
 }
 
@@ -231,6 +265,7 @@ static int pram_symlink(const char* target, const char* path)
  */
 static int pram_truncate(const char* path, off_t length)
 {
+  /* TODO */
   sync_return(truncate(p(path), length));
 }
 
@@ -244,6 +279,7 @@ static int pram_truncate(const char* path, off_t length)
  */
 static int pram_ftruncate(const char* path, off_t length, struct fuse_file_info* fi)
 {
+  /* TODO */
   (void) path;
   return r(ftruncate(fi->fh, length));
 }
@@ -257,6 +293,7 @@ static int pram_ftruncate(const char* path, off_t length, struct fuse_file_info*
  */
 static int pram_unlink(const char* path)
 {
+  /* TODO */
   sync_return(unlink(p(path)));
 }
 
@@ -270,6 +307,7 @@ static int pram_unlink(const char* path)
  */
 static int pram_readlink(const char* path, char* target, size_t size)
 {
+  /* TODO */
   sync_call(long n = readlink(p(path), target, size - 1));
   if (n < 0)
     throw errno;
@@ -286,6 +324,7 @@ static int pram_readlink(const char* path, char* target, size_t size)
  */
 static int pram_access(const char* path, int mode)
 {
+  /* TODO */
   sync_return(access(p(path), mode));
 }
 
@@ -299,6 +338,7 @@ static int pram_access(const char* path, int mode)
  */
 static int pram_flock(const char* path, struct fuse_file_info* fi, int op)
 {
+  /* TODO */
   (void) path;
   return r(flock(fi->fh, op));
 }
@@ -313,6 +353,7 @@ static int pram_flock(const char* path, struct fuse_file_info* fi, int op)
  */
 static int pram_fsync(const char* path, int isdatasync, struct fuse_file_info* fi)
 {
+  /* TODO */
   (void) path;
   return r(isdatasync ? fdatasync(fi->fh) : fsync(fi->fh));
 }
@@ -327,6 +368,7 @@ static int pram_fsync(const char* path, int isdatasync, struct fuse_file_info* f
  */
 static int pram_fsyncdir(const char* path, int isdatasync, struct fuse_file_info* fi)
 {
+  /* TODO */
   (void) path;
   return r(isdatasync ? fdatasync(fi->fh) : fsync(fi->fh));
 }
@@ -340,6 +382,7 @@ static int pram_fsyncdir(const char* path, int isdatasync, struct fuse_file_info
  */
 static int pram_release(const char* path, struct fuse_file_info* fi)
 {
+  /* TODO */
   (void) path;
   return r(close(fi->fh));
 }
@@ -356,6 +399,7 @@ static int pram_release(const char* path, struct fuse_file_info* fi)
  */
 static int pram_fallocate(const char* path, int mode, off_t off, off_t len, struct fuse_file_info* fi)
 {
+  /* TODO */
   (void) path;
   #ifdef linux
     return r(fallocate(fi->fh, mode, off, len));
@@ -377,6 +421,7 @@ static int pram_fallocate(const char* path, int mode, off_t off, off_t len, stru
  */
 static int pram_lock(const char* path, struct fuse_file_info* fi, int cmd, struct flock* lock)
 {
+  /* TODO */
   (void) path;
   return ulockmgr_op(fi->fh, cmd, lock, &(fi->lock_owner), sizeof(fi->lock_owner));
 }
@@ -390,6 +435,7 @@ static int pram_lock(const char* path, struct fuse_file_info* fi, int cmd, struc
  */
 static int pram_flush(const char* path, struct fuse_file_info* fi)
 {
+  /* TODO */
   (void) path;
   /* FILE* is needed for fflush, and there is not flush, so we need to duplicate and close  */
   return r(close(dup(fi->fh)));
@@ -407,6 +453,7 @@ static int pram_flush(const char* path, struct fuse_file_info* fi)
  */
 static int pram_write(const char* path, const char* buf, size_t len, off_t off, struct fuse_file_info* fi)
 {
+  /* TODO */
   (void) path;
   return r(pwrite(fi->fh, buf, len, off));
 }
@@ -423,6 +470,7 @@ static int pram_write(const char* path, const char* buf, size_t len, off_t off, 
  */
 static int pram_read(const char* path, char* buf, size_t len, off_t off, struct fuse_file_info* fi)
 {
+  /* TODO */
   (void) path;
   return r(pread(fi->fh, buf, len, off));
 }
@@ -438,6 +486,7 @@ static int pram_read(const char* path, char* buf, size_t len, off_t off, struct 
  */
 static int pram_write_buf(const char* path, struct fuse_bufvec* buf, off_t off, struct fuse_file_info* fi)
 {
+  /* TODO */
   (void) path;
   struct fuse_bufvec dest = FUSE_BUFVEC_INIT(fuse_buf_size(buf));
   dest.buf->flags = FUSE_BUF_IS_FD | FUSE_BUF_FD_SEEK;
@@ -458,6 +507,7 @@ static int pram_write_buf(const char* path, struct fuse_bufvec* buf, off_t off, 
  */
 static int pram_read_buf(const char* path, struct fuse_bufvec** bufp, size_t len, off_t off, struct fuse_file_info* fi)
 {
+  /* TODO */
   (void) path;
   struct fuse_bufvec* src = (struct fuse_bufvec*)malloc(sizeof(struct fuse_bufvec));
   if (src == NULL)
@@ -479,6 +529,7 @@ static int pram_read_buf(const char* path, struct fuse_bufvec** bufp, size_t len
  */
 static int pram_releasedir(const char* path, struct fuse_file_info* fi)
 {
+  /* TODO */
   (void) path;
   struct pram_dir_info* di = (struct pram_dir_info*)(uintptr_t)(fi->fh);
   int err = r(closedir(di->dp));
@@ -495,6 +546,7 @@ static int pram_releasedir(const char* path, struct fuse_file_info* fi)
  */
 static int pram_opendir(const char* path, struct fuse_file_info* fi)
 {
+  /* TODO */
   struct pram_dir_info* di = (struct pram_dir_info*)malloc(sizeof(struct pram_dir_info));
   if (di == NULL)
     throw ENOMEM;
@@ -523,6 +575,7 @@ static int pram_opendir(const char* path, struct fuse_file_info* fi)
  */
 static int pram_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t off, struct fuse_file_info* fi)
 {
+  /* TODO */
   (void) path;
   struct pram_dir_info* di = (struct pram_dir_info*)(uintptr_t)(fi->fh);
   if (off != di->offset)
@@ -560,6 +613,7 @@ static int pram_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off
  */
 static int pram_create(const char* path, mode_t mode, struct fuse_file_info* fi)
 {
+  /* TODO */
   sync_call(int fd = open(p(path), fi->flags, mode));
   if (fd < 0)
     throw fd;
@@ -576,6 +630,7 @@ static int pram_create(const char* path, mode_t mode, struct fuse_file_info* fi)
  */
 static int pram_open(const char* path, struct fuse_file_info* fi)
 {
+  /* TODO */
   sync_call(int fd = open(p(path), fi->flags));
   if (fd < 0)
     throw fd;
@@ -592,6 +647,7 @@ static int pram_open(const char* path, struct fuse_file_info* fi)
  */
 static int pram_utimens(const char* path, const struct timespec ts[2])
 {
+  /* TODO */
   sync_return(utimensat(0, p(path), ts, AT_SYMLINK_NOFOLLOW));
 }
 
