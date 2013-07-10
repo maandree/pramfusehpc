@@ -37,6 +37,8 @@
 #include <sys/file.h>
 #include <attr/xattr.h>
 
+#include "map.h"
+
 
 
 /** Auxiliary syntax **/

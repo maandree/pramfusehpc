@@ -25,7 +25,9 @@
 /**
  * The binary logarithm of the number of levels per character in the map data structure
  */
-#define MAP_LB_LEVELS  1
+#ifndef MAP_LB_LEVELS
+  #define MAP_LB_LEVELS  1
+#endif
 
 /**
  * The levels per character in the map data structure
