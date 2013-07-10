@@ -98,7 +98,7 @@ static int pram_fgetattr(const char* path, struct stat* attr, struct fuse_file_i
 {
   (void) path;
   _lock;
-  *attr = ((struct pram_file*)(void*)(fi->fh))->cache->attr;
+  *attr = ((struct pram_file_info*)(void*)(fi->fh))->cache->attr;
   _unlock;
   return 0;
 }
@@ -198,9 +198,9 @@ static int pram_rename(const char* source, const char* path)
 	pram_map_put(pram_file_cache, path, pram_map_get(pram_file_cache, source));
 	pram_map_put(pram_file_cache, source, NULL);
       }
-  _unlunk;
+  _unlock;
   free(_source);
-  return r(rc);
+  return r(error);
 }
 
 /**
@@ -299,7 +299,7 @@ static int pram_unlink(const char* path)
       if (cache->attr.st_nlink == 0)
 	{
 	  free(cache);
-	  pram_map_put(pram_file_cache, NULL);
+	  pram_map_put(pram_file_cache, path, NULL);
 	}
     }
   int rc = unlink(p(path));
@@ -859,7 +859,7 @@ int main(int argc, char** argv)
  * @param   b  The second comparand
  * @return     The comparands' equality
  */
-static inline long eq(char* a, char* b)
+static inline long eq(const char* a, const char* b)
 {
   while (*a && *b)
     if (*a++ != *b++)
@@ -897,7 +897,7 @@ static char* p(const char* path)
  * @param   path  The path in RAM
  * @return        The path on HDD
  */
-static inline char* q(char* hdd, const char* path)
+static inline char* q(const char* hdd, const char* path)
 {
   pathbuf = (char*)malloc(pathbufsize * sizeof(char));
   for (int i = 0; i < hddlen; i++)
