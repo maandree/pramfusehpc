@@ -384,20 +384,6 @@ static int pram_fsyncdir(const char* path, int isdatasync, struct fuse_file_info
 }
 
 /**
- * Close an open file
- * 
- * @param   path  The file
- * @param   fi    File information
- * @return        Error code
- */
-static int pram_release(const char* path, struct fuse_file_info* fi)
-{
-  /* TODO */
-  (void) path;
-  return r(close(fi->fh));
-}
-
-/**
  * Preallocate file space for writing
  * 
  * @param   path  The file
@@ -449,6 +435,23 @@ static int pram_flush(const char* path, struct fuse_file_info* fi)
   (void) path;
   /* FILE* is needed for fflush, and there is not flush, so we need to duplicate and close  */
   return r(close(dup(fi->fh)));
+}
+
+/**
+ * Close an open file
+ * 
+ * @param   path  The file
+ * @param   fi    File information
+ * @return        Error code
+ */
+static int pram_release(const char* path, struct fuse_file_info* fi)
+{
+  pram_flush(path, fi);
+  struct pram_file_info* file = (struct pram_file_info*)(uintptr_t)(fi->fh);
+  int rc = close(file->fd);
+  free(file->cache);
+  free(file);
+  return r(rc);
 }
 
 /**
