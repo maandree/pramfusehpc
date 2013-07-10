@@ -673,8 +673,15 @@ static int pram_utimens(const char* path, const struct timespec ts[2])
 	  }
 	else
 	  {
-	    cache->attr.atim = ts[0];
-	    cache->attr.mtim = ts[1];
+	    #if defined __USE_MISC || defined __USE_XOPEN2K8
+	      cache->attr.st_atim = ts[0];
+	      cache->attr.st_mtim = ts[1];
+	    #else
+	      cache->attr.st_atime = ts[0].tv_sec;
+	      cache->attr.st_mtime = ts[1].tv_sec;
+	      cache->attr.st_atimensec = ts[0].tv_nsec;
+	      cache->attr.st_mtimensec = ts[1].tv_nsec;
+	    #endif
 	  }
       }
   _unlock;
