@@ -183,7 +183,7 @@ struct pram_file
  * @param   b  The second comparand
  * @return     The comparands' equality
  */
-static inline long eq(char* a, char* b);
+static inline long eq(const char* a, const char* b);
 
 /**
  * Return a path as it is named on the HDD relative to the root mount path
@@ -201,7 +201,7 @@ static char* p(const char* path);
  * @param   path  The path in RAM
  * @return        The path on HDD
  */
-static inline char* q(char* hdd, const char* path);
+static inline char* q(const char* hdd, const char* path);
 
 /**
  * Get the value to return for a FUSE operation
