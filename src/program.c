@@ -193,10 +193,11 @@ static int pram_rename(const char* source, const char* path)
   char* _source = p(source);
   int error = rename(_source, q(_source, path));
   if (!error)
-    {
-      pram_map_put(pram_file_cache, path, pram_map_get(pram_file_cache, source));
-      pram_map_put(pram_file_cache, source, NULL);
-    }
+    if (!eq(source, path))
+      {
+	pram_map_put(pram_file_cache, path, pram_map_get(pram_file_cache, source));
+	pram_map_put(pram_file_cache, source, NULL);
+      }
   _unlunk;
   free(_source);
   return r(rc);
