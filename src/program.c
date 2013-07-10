@@ -623,12 +623,24 @@ static int pram_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off
  */
 static int pram_create(const char* path, mode_t mode, struct fuse_file_info* fi)
 {
-  /* TODO */
   /* TODO dir is not cached*/
-  sync_call(int fd = open(p(path), fi->flags, mode));
+  _lock;
+  int fd = open(p(path), fi->flags, mode);
   if (fd < 0)
     throw fd;
-  fi->fh = fd;
+  struct pram_file* cache = (struct pram_file*)malloc(sizeof(struct pram_file));
+  int error = get_file_cache(path, &cache);
+  _unlock;
+  if (error)
+    {
+      free(cache);
+      close(fd);
+      return error;
+    }
+  struct pram_file_info* file = (struct pram_file_info*)malloc(sizeof(struct pram_file_info));
+  file->fd = fd;
+  file->cache = cache;
+  fi->fh = (uint64_t)(void*)file;
   return 0;
 }
 
@@ -641,11 +653,23 @@ static int pram_create(const char* path, mode_t mode, struct fuse_file_info* fi)
  */
 static int pram_open(const char* path, struct fuse_file_info* fi)
 {
-  /* TODO */
-  sync_call(int fd = open(p(path), fi->flags));
+  _lock;
+  int fd = open(p(path), fi->flags);
   if (fd < 0)
     throw fd;
-  fi->fh = fd;
+  struct pram_file* cache = (struct pram_file*)malloc(sizeof(struct pram_file));
+  int error = get_file_cache(path, &cache);
+  _unlock;
+  if (error)
+    {
+      free(cache);
+      close(fd);
+      return error;
+    }
+  struct pram_file_info* file = (struct pram_file_info*)malloc(sizeof(struct pram_file_info));
+  file->fd = fd;
+  file->cache = cache;
+  fi->fh = (uint64_t)(void*)file;
   return 0;
 }
 
