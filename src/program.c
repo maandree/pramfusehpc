@@ -98,7 +98,7 @@ static int pram_fgetattr(const char* path, struct stat* attr, struct fuse_file_i
 {
   (void) path;
   _lock;
-  *attr = ((struct pram_file_info*)(void*)(fi->fh))->cache->attr;
+  *attr = fcache(fi)->attr;
   _unlock;
   return 0;
 }

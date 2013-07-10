@@ -237,3 +237,11 @@ int get_user_info(uid_t* user, gid_t* group, mode_t* umask, pid_t* process, gid_
  */
 int get_file_cache(const char* path, struct pram_file** cache);
 
+/**
+ * Gets the file cache for a file by its file information provided by FUSE
+ * 
+ * @param   FI:struct fuse_file_info*  The file information
+ * @return  :struct pram_file*         The file's cache
+ */
+#define fcache(FI)  (((struct pram_file_info*)(void*)((FI)->fh))->cache)
+
