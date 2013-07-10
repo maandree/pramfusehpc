@@ -16,5 +16,5 @@ LDFLAGS = $(LDFLAGS_FUSE) -lulockmgr
 
 all:
 	@mkdir -p bin
-	"$(CC)" $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o bin/pramfusehpc src/program.c
+	"$(CC)" $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o bin/pramfusehpc src/program.c src/map.c
 
