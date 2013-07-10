@@ -31,7 +31,18 @@
  */
 static int pram_chmod(const char* path, mode_t mode)
 {
-  sync_return(chmod(p(path), mode));
+  struct pram_file* cache = NULL;
+  _lock;
+  int error = get_file_cache(path, &cache);
+  if (error)
+    return error;
+  if (cache->attr.st_mode != mode)
+    {
+      error = chmod(pathbuf, mode);
+      cache->attr.st_mode = mode;
+    }
+  _unlock;
+  return error;
 }
 
 /**
@@ -845,5 +856,32 @@ int get_user_info(uid_t* user, gid_t* group, mode_t* umask, pid_t* process, gid_
   
   int ret = fuse_getgroups(n, supplemental);
   return ret == -ENOSYS ? 0 : ret;
+}
+
+
+/**
+ * Gets the file cache for a file by its name
+ * 
+ * @param   path   The file
+ * @param   cache  Area to put the cache in
+ * @return         Error code
+ */
+int get_file_cache(const char* path, struct pram_file** cache)
+{
+  void* ret = pram_map_get(pram_file_cache, path);
+  if (ret == NULL)
+    {
+      struct stat attr;
+      int error = lstat(p(path), &attr);
+      if (error)
+	throw errno;
+      struct pram_file* c = (struct pram_file*)malloc(sizeof(struct pram_file));
+      memset(c, 0, sizeof(struct pram_file));
+      (*cache = c)->attr = attr;
+      pram_map_put(pram_file_cache, path, c);
+    }
+  else
+    *cache = (struct pram_file*)ret;
+  return 0;
 }
 

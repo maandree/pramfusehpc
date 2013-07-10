@@ -71,7 +71,7 @@ static pthread_mutex_t pram_mutex;
 /**
  * File cache map
  */
-static pram_map* pram_file_cache;
+pram_map* pram_file_cache;
 
 
 
@@ -98,19 +98,31 @@ struct pram_dir_info
 
 
 /**
- * Information for cached files
+ * Information for opened files
  */
 struct pram_file_info
 {
   /**
-   * Contains information such as for example proctection, inode number and ownership
+   * Information cache
    */
-  struct stat attr;
+  struct pram_file* cache;
   
   /**
    * File description
    */
   uint64_t fd;
+};
+
+
+/**
+ * Information for cached files
+ */
+struct pram_file
+{
+  /**
+   * Contains information such as for example proctection, inode number and ownership
+   */
+  struct stat attr;
 };
 
 
@@ -213,4 +225,15 @@ static inline int r(int rc);
  * @return                Error code or the total (can exceed `supplemental`) number of supplemental groups
  */
 int get_user_info(uid_t* user, gid_t* group, mode_t* umask, pid_t* process, gid_t* supplemental, int n);
+
+
+
+/**
+ * Gets the file cache for a file by its name
+ * 
+ * @param   path   The file
+ * @param   cache  Area to put the cache in
+ * @return         Error code
+ */
+int get_file_cache(const char* path, struct pram_file** cache);
 
