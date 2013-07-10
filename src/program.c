@@ -298,6 +298,7 @@ static int pram_unlink(const char* path)
       cache->attr.st_nlink--;
       if (cache->attr.st_nlink == 0)
 	{
+	  free(cache->buffer);
 	  free(cache);
 	  pram_map_put(pram_file_cache, path, NULL);
 	}
@@ -875,7 +876,14 @@ int main(int argc, char** argv)
   free(hdd);
   free(_argv);
   free(pathbuf);
-  free(pram_map_free(pram_file_cache));
+  struct pram_file** file_caches = pram_map_free(pram_file_cache);
+  struct pram_file* file_cache;
+  while ((file_cache = *file_caches++))
+    {
+      free(file_cache->buffer)
+      free(file_cache);
+    }
+  free(file_caches);
   free(pram_file_cache);
   /* pthread_cancel(background_thread); */
   /* pthread_join(background_thread, NULL); */
