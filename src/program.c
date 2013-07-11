@@ -801,7 +801,6 @@ static struct fuse_operations pram_oper = {
   
   /*
     what about fadvice?
-    what about readahead?
   */
   
   /* Operations with fd does not need path, HOWEVER, unlinked files cannot be accessed. */
