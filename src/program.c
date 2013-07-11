@@ -574,51 +574,6 @@ static int pram_read(const char* path, char* buf, size_t len, off_t off, struct 
 }
 
 /**
- * Write a buffer to a position in a file
- * 
- * @param    path  The file
- * @param    buf   The buffer to write
- * @param    off   The offset in the file at which to start the write
- * @param    fi    File information
- * @return         Error code if negative, and number of written bytes if non-negative
- */
-static int pram_write_buf(const char* path, struct fuse_bufvec* buf, off_t off, struct fuse_file_info* fi)
-{
-  /* TODO */
-  (void) path;
-  struct fuse_bufvec dest = FUSE_BUFVEC_INIT(fuse_buf_size(buf));
-  dest.buf->flags = FUSE_BUF_IS_FD | FUSE_BUF_FD_SEEK;
-  dest.buf->fd = fi->fh;
-  dest.buf->pos = off;
-  return fuse_buf_copy(&dest, buf, FUSE_BUF_SPLICE_NONBLOCK);
-}
-
-/**
- * Read a part of a file
- * 
- * @param    path  The file
- * @param    bufp  The buffer to which to write read bytes
- * @param    len   The number of bytes to read
- * @param    off   The offset in the file at which to start the read
- * @param    fi    File information
- * @return         Error code
- */
-static int pram_read_buf(const char* path, struct fuse_bufvec** bufp, size_t len, off_t off, struct fuse_file_info* fi)
-{
-  /* TODO */
-  (void) path;
-  struct fuse_bufvec* src = (struct fuse_bufvec*)malloc(sizeof(struct fuse_bufvec));
-  if (src == NULL)
-    throw ENOMEM;
-  *src = FUSE_BUFVEC_INIT(len);
-  src->buf->flags = FUSE_BUF_IS_FD | FUSE_BUF_FD_SEEK;
-  src->buf->fd = fi->fh;
-  src->buf->pos = off;
-  *bufp = src;
-  return 0;
-}
-
-/**
  * Close a directory
  * 
  * @param   path  The file
@@ -832,8 +787,6 @@ static struct fuse_operations pram_oper = {
   .flush = pram_flush,
   .write = pram_write,
   .read = pram_read,
-  .write_buf = pram_write_buf,
-  .read_buf = pram_read_buf,
   .releasedir = pram_releasedir,
   .opendir = pram_opendir,
   .readdir = pram_readdir,
