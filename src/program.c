@@ -556,9 +556,8 @@ static int pram_fallocate(const char* path, int mode, off_t off, off_t len, stru
  */
 static int pram_lock(const char* path, struct fuse_file_info* fi, int cmd, struct flock* lock)
 {
-  /* TODO */
   (void) path;
-  return ulockmgr_op(fi->fh, cmd, lock, &(fi->lock_owner), sizeof(fi->lock_owner));
+  return ulockmgr_op(ffd(fi->fh), cmd, lock, &(fi->lock_owner), sizeof(fi->lock_owner));
 }
 
 /**
