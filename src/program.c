@@ -384,6 +384,7 @@ static int pram_unlink(const char* path)
       if (cache->attr.st_nlink == 0)
 	{
 	  free(cache->buffer);
+	  free(cache->link);
 	  free(cache);
 	  pram_map_put(pram_file_cache, path, NULL);
 	}
@@ -391,24 +392,6 @@ static int pram_unlink(const char* path)
   int rc = unlink(p(path));
   _unlock;
   return r(rc);
-}
-
-/**
- * Read value of a symbolic link
- * 
- * @param   path    The file
- * @param   target  The target storage
- * @param   size    The size of `target`
- * @return          Error code
- */
-static int pram_readlink(const char* path, char* target, size_t size)
-{
-  /* TODO */
-  sync_call(long n = readlink(p(path), target, size - 1));
-  if (n < 0)
-    throw errno;
-  *(target + n) = 0;
-  return 0;
 }
 
 /**
@@ -422,6 +405,65 @@ static int pram_access(const char* path, int mode)
 {
   /* TODO */
   sync_return(access(p(path), mode));
+}
+
+/**
+ * Read value of a symbolic link
+ * 
+ * @param   path    The file
+ * @param   target  The target storage
+ * @param   size    The size of `target`
+ * @return          Error code
+ */
+static int pram_readlink(const char* path, char* target, size_t size)
+{
+  if (size <= 0)
+    throw EINVAL;
+  struct pram_file* cache = NULL;
+  _lock;
+  int error = r(get_file_cache(path, &cache));
+  _unlock;
+  if (!error)
+    {
+      if (S_ISLNK(cache->attr.st_mode) == false)
+	throw EINVAL;
+      else if (!(error = pram_access(path, R_OK | X_OK)))
+	{
+	  _lock;
+	  if ((cache->link) == false)
+	    {
+	      char* link = (char*)malloc(1024 * sizeof(char));
+	      long n = readlink(p(path), link, 1023);
+	      if (n < 0)
+		{
+		  free(link);
+		  throw errno;
+		}
+	      else if (n > 1023)
+		{
+		  link = (char*)realloc(link, (n + 1) * sizeof(char));
+		  if ((n = readlink(pathbuf, link, 1023)) < 0)
+		    {
+		      free(link);
+		      throw errno;
+		    }
+		}
+	      else if (n < 1023)
+		link = (char*)realloc(link, (n + 1) * sizeof(char));
+	      *(link + n) = 0;
+	      cache->link = link;
+	      cache->linkn = n + 1;
+	    }
+	  char* link = cache->link;
+	  for (size_t i = 0; i < size; i++)
+	    if ((*(target + i) + *(link + i)) == 0)
+	      break;
+	  *(target + size - 1) = 0;
+	  error = cache->linkn;
+	  _unlock;
+	}
+    }
+  return error;
 }
 
 /**
@@ -917,6 +959,7 @@ int main(int argc, char** argv)
   struct pram_file* file_cache;
   while ((file_cache = *file_caches++))
     {
+      free(file_cache->link);
       free(file_cache->buffer);
       free(file_cache);
     }

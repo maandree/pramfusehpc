@@ -133,6 +133,16 @@ struct pram_file
    * The buffer
    */
   char* buffer;
+  
+  /**
+   * The content of the file if it is a symbolic link
+   */
+  char* link;
+  
+  /**
+   * The size of `link`
+   */
+  unsigned long linkn;
 };
 
 
