@@ -589,7 +589,11 @@ static int pram_flush(const char* path, struct fuse_file_info* fi)
     }
   else
     _unlock;
-  return r(close(dup(fd)));
+  int rc = r(close(dup(fd)));
+  struct stat attr;
+  if (!(lstat(p(path), &attr)))
+    cache->attr = attr;
+  return rc;
 }
 
 /**
