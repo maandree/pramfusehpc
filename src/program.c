@@ -530,21 +530,6 @@ static int pram_fallocate(const char* path, int mode, off_t off, off_t len, stru
 }
 
 /**
- * Apply or remove an advisory lock on a file
- * 
- * @param   path  The file
- * @param   fi    File information
- * @param   cmd   Lock command
- * @param   lock  Lock object
- * @return        Error code
- */
-static int pram_lock(const char* path, struct fuse_file_info* fi, int cmd, struct flock* lock)
-{
-  (void) path;
-  return ulockmgr_op(ffd(fi), cmd, lock, &(fi->lock_owner), sizeof(fi->lock_owner));
-}
-
-/**
  * Flush file
  * 
  * @param   path  The file
@@ -958,7 +943,6 @@ static struct fuse_operations pram_oper = {
   .fsync = pram_fsync,
   .fsyncdir = pram_fsyncdir,
   .release = pram_release,
-  .lock = pram_lock,
   .flush = pram_flush,
   .write = pram_write,
   .read = pram_read,
