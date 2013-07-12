@@ -18,7 +18,16 @@ CFLAGS = $(OPTIMISE) -std=gnu11 -Wall -Wextra -pedantic $(CFLAGS_FUSE)
 LDFLAGS = $(LDFLAGS_FUSE) -lulockmgr
 
 
-all:
+all: bin/pramfusehpc
+
+bin/pramfusehpc: src/program.c src/program.h src/map.c src/map.h
 	@mkdir -p bin
-	"$(CC)" $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o bin/pramfusehpc src/program.c src/map.c
+	"$(CC)" $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o "$@" $$(for f in $^; do echo $$f ; done | grep 'c$$')
+
+
+clean:
+	-rm -r bin 2>/dev/null
+
+
+.PHONY: all clean
 
