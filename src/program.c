@@ -490,8 +490,8 @@ static int pram_access(const char* path, int mode)
 	    n = 0;
 	}
 	  mode_t mod = cache->attr.st_mode;
-	  mode_t uid = cache->attr.st_uid;
-	  mode_t gid = cache->attr.st_gid;
+	  uid_t uid = cache->attr.st_uid;
+	  gid_t gid = cache->attr.st_gid;
 	  mode_t test = 0;
 	  test |= (mode & R_OK) ? 0 : 4;
 	  test |= (mode & W_OK) ? 0 : 2;
@@ -501,17 +501,17 @@ static int pram_access(const char* path, int mode)
 	    test |= (mod & 0700) >> 6;
 	  if (group == gid)
 	    test |= (mod & 070) >> 3;
-	  if ((mod & 7) != 7)
+	  if ((test & 7) != 7)
 	    {
 	      for (int i = 0; i != n; i++)
-		if ((mod & 7) == 7)
+		if ((test & 7) == 7)
 		  break;
 		else
 		  if (*(supplemental + i) == gid)
 		    test |= (mod & 070) >> 3;
 	    }
 	  free(supplemental);
-	  return (mod & 7) == 7 ? 0 : -EACCES;
+	  return (test & 7) == 7 ? 0 : -EACCES;
     }
 }
 
