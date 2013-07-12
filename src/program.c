@@ -493,22 +493,6 @@ static int pram_flock(const char* path, struct fuse_file_info* fi, int op)
 }
 
 /**
- * Synchronize changes to a file to the underlaying storage device
- * 
- * @param   path        The file
- * @param   isdatasync  Whether to use `fdatasync` rather than `fsync` if available
- * @param   fi          File information
- * @return              Error code
- */
-static int pram_fsync(const char* path, int isdatasync, struct fuse_file_info* fi)
-{
-  int error = pram_flush(path, fi);
-  if (error)
-    return error;
-  return r(isdatasync ? fdatasync(fi->fh) : fsync(fi->fh));
-}
-
-/**
  * Synchronize changes to a directory to the underlaying storage device
  * 
  * @param   path        The file
@@ -557,7 +541,7 @@ static int pram_fallocate(const char* path, int mode, off_t off, off_t len, stru
 static int pram_lock(const char* path, struct fuse_file_info* fi, int cmd, struct flock* lock)
 {
   (void) path;
-  return ulockmgr_op(ffd(fi->fh), cmd, lock, &(fi->lock_owner), sizeof(fi->lock_owner));
+  return ulockmgr_op(ffd(fi), cmd, lock, &(fi->lock_owner), sizeof(fi->lock_owner));
 }
 
 /**
@@ -582,7 +566,7 @@ static int pram_flush(const char* path, struct fuse_file_info* fi)
       cache->buffer = NULL;
       _unlock;
       unsigned long ptr = 0, wrote;
-      while (ptr < 0)
+      while (ptr < n)
 	{
 	  ptr += wrote = pwrite(fd, buffer + ptr, n - ptr, ptr);
 	  if (wrote == 0)
@@ -595,7 +579,7 @@ static int pram_flush(const char* path, struct fuse_file_info* fi)
 	      else
 		{
 		  cache->allocated = n;
-		  cache->buffer;
+		  cache->buffer = buffer;
 		}
 	      _unlock;
 	      throw wrote;
@@ -606,6 +590,22 @@ static int pram_flush(const char* path, struct fuse_file_info* fi)
   else
     _unlock;
   return r(close(dup(fd)));
+}
+
+/**
+ * Synchronize changes to a file to the underlaying storage device
+ * 
+ * @param   path        The file
+ * @param   isdatasync  Whether to use `fdatasync` rather than `fsync` if available
+ * @param   fi          File information
+ * @return              Error code
+ */
+static int pram_fsync(const char* path, int isdatasync, struct fuse_file_info* fi)
+{
+  int error = pram_flush(path, fi);
+  if (error)
+    return error;
+  return r(isdatasync ? fdatasync(fi->fh) : fsync(fi->fh));
 }
 
 /**
