@@ -538,7 +538,7 @@ static int pram_readlink(const char* path, char* target, size_t size)
       else if (!(error = pram_access(path, R_OK | X_OK)))
 	{
 	  _lock;
-	  if ((cache->link) == false)
+	  if ((cache->linkn) == 0)
 	    {
 	      char* link = (char*)malloc(1024 * sizeof(char));
 	      long n = readlink(p(path), link, 1023);
@@ -566,10 +566,9 @@ static int pram_readlink(const char* path, char* target, size_t size)
 	    }
 	  char* link = cache->link;
 	  for (size_t i = 0; i < size; i++)
-	    if ((*(target + i) + *(link + i)) == 0)
+	    if ((*(target + i) = *(link + i)) == 0)
 	      break;
 	  *(target + size - 1) = 0;
-	  error = cache->linkn;
 	  _unlock;
 	}
     }
@@ -730,11 +729,7 @@ static int pram_flush(const char* path, struct fuse_file_info* fi)
   else
     _unlock;
   /* FILE* is needed for fflush, and there is not flush, so we need to duplicate and close  */
-  int rc = r(close(dup(fd)));
-  struct stat attr;
-  if (!(lstat(p(path), &attr)))
-    cache->attr = attr;
-  return rc;
+  return r(close(dup(fd)));
 }
 
 /**
@@ -1343,6 +1338,8 @@ int get_file_cache(const char* path, struct pram_file** cache)
       (*cache = c)->attr = attr;
       c->buffer = NULL;
       c->allocated = 0;
+      c->link = NULL;
+      c->linkn = 0;
       pthread_mutex_init(&(c->mutex), NULL);
       pram_map_put(pram_file_cache, path, c);
     }
