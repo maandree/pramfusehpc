@@ -255,7 +255,16 @@ static int pram_statfs(const char* path, struct statvfs* value)
  */
 static int pram_symlink(const char* target, const char* path)
 {
-  sync_return(symlink(target, p(path)));  /* TODO dir is not cached */
+  _lock;
+  void* ret = pram_map_get(pram_file_cache, path);
+  if (ret)
+    {
+      _unlock;
+      throw EEXIST;
+    }
+  int rc = symlink(target, p(path));  /* TODO dir is not cached */
+  _unlock;
+  return r(rc);
 }
 
 /**
