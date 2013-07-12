@@ -502,8 +502,9 @@ static int pram_flock(const char* path, struct fuse_file_info* fi, int op)
  */
 static int pram_fsync(const char* path, int isdatasync, struct fuse_file_info* fi)
 {
-  /* TODO */
-  (void) path;
+  int error = pram_flush(path, fi);
+  if (error)
+    return error;
   return r(isdatasync ? fdatasync(fi->fh) : fsync(fi->fh));
 }
 
@@ -517,9 +518,8 @@ static int pram_fsync(const char* path, int isdatasync, struct fuse_file_info* f
  */
 static int pram_fsyncdir(const char* path, int isdatasync, struct fuse_file_info* fi)
 {
-  /* TODO */
   (void) path;
-  return r(isdatasync ? fdatasync(fi->fh) : fsync(fi->fh));
+  return r(isdatasync ? fdatasync(fi->fh) : fsync(fi->fh));  /* TODO dir is not cached */
 }
 
 /**
