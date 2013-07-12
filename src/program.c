@@ -800,6 +800,7 @@ static int pram_utimens(const char* path, const struct timespec ts[2])
 	      cache->attr.st_atimensec = ts[0].tv_nsec;
 	      cache->attr.st_mtimensec = ts[1].tv_nsec;
 	    #endif
+	    /* TODO update ctime? */
 	  }
       }
   _unlock;
