@@ -414,8 +414,65 @@ static int pram_unlink(const char* path)
  */
 static int pram_access(const char* path, int mode)
 {
-  /* TODO */
-  sync_return(access(p(path), mode));
+  _lock;
+  void* ret = pram_map_get(pram_file_cache, path);
+  if (ret == NULL)
+    {
+      int rc = access(pathbuf, mode);
+      _unlock;
+      return r(rc);
+    }
+  else
+    {
+      _unlock;
+      struct pram_file* cache = (struct pram_file*)ret;
+      uid_t user;
+      gid_t group;
+      mode_t _umask;
+      pid_t _process;
+      gid_t* supplemental = (gid_t*)malloc(128 * sizeof(gid_t));
+      if (supplemental == NULL)
+	throw ENOMEM;
+      int n = get_user_info(&user, &group, &_umask, &_process, supplemental, 128);
+      if (n < 0)
+	n = 0;
+      else if (n > 128)
+	{
+	  gid_t* _supplemental = supplemental;
+	  supplemental = (gid_t*)realloc(supplemental, n * sizeof(gid_t));
+	  if (supplemental == NULL)
+	    {
+	      free(_supplemental);
+	      throw ENOMEM;
+	    }
+	  n = get_user_info(&user, &group, &_umask, &_process, supplemental, n);
+	  if (n < 0)
+	    n = 0;
+	}
+	  mode_t mod = cache->attr.st_mode;
+	  mode_t uid = cache->attr.st_uid;
+	  mode_t gid = cache->attr.st_gid;
+	  mode_t test = 0;
+	  test |= (mode & R_OK) ? 0 : 4;
+	  test |= (mode & W_OK) ? 0 : 2;
+	  test |= (mode & X_OK) ? 0 : 1;
+	  test |= mod & 7;
+	  if (user == uid)
+	    test |= (mod & 0700) >> 6;
+	  if (group == gid)
+	    test |= (mod & 070) >> 3;
+	  if ((mod & 7) != 7)
+	    {
+	      for (int i = 0; i != n; i++)
+		if ((mod & 7) == 7)
+		  break;
+		else
+		  if (*(supplemental + i) == gid)
+		    test |= (mod & 070) >> 3;
+	    }
+	  free(supplemental);
+	  return (mod & 7) == 7 ? 0 : -EACCES;
+    }
 }
 
 /**
