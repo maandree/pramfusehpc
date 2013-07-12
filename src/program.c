@@ -554,7 +554,6 @@ static int pram_lock(const char* path, struct fuse_file_info* fi, int cmd, struc
 static int pram_flush(const char* path, struct fuse_file_info* fi)
 {
   (void) path;
-  /* FILE* is needed for fflush, and there is not flush, so we need to duplicate and close  */
   struct pram_file* cache = fcache(fi);
   uint64_t fd = ffd(fi);
   unsigned long n;
@@ -589,6 +588,7 @@ static int pram_flush(const char* path, struct fuse_file_info* fi)
     }
   else
     _unlock;
+  /* FILE* is needed for fflush, and there is not flush, so we need to duplicate and close  */
   int rc = r(close(dup(fd)));
   struct stat attr;
   if (!(lstat(p(path), &attr)))
