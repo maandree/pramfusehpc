@@ -445,6 +445,7 @@ static int pram_readlink(const char* path, char* target, size_t size)
 	      long n = readlink(p(path), link, 1023);
 	      if (n < 0)
 		{
+		  _unlock;
 		  free(link);
 		  throw errno;
 		}
@@ -453,6 +454,7 @@ static int pram_readlink(const char* path, char* target, size_t size)
 		  link = (char*)realloc(link, (n + 1) * sizeof(char));
 		  if ((n = readlink(pathbuf, link, 1023)) < 0)
 		    {
+		      _unlock;
 		      free(link);
 		      throw errno;
 		    }
