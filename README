@@ -1,5 +1,7 @@
-pramfusehpc: Persistent Random Access Memory Filesystem in Userspace for High Performance Computing
+pramfusehpc: Persistent Random Access Memory Filesystem in
+Userspace for High Performance Computing
 
-pramfusehpc is a FUSE module write to another mounted filesystem but reads the RAM to optimise
-access time at the cost of RAM space.
+pramfusehpc is a FUSE module that write to another mounted
+filesystem but reads the RAM to optimise access time at the
+cost of RAM space.
 
