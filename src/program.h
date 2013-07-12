@@ -265,3 +265,11 @@ int get_file_cache(const char* path, struct pram_file** cache);
  */
 #define fcache(FI)  (((struct pram_file_info*)(void*)((FI)->fh))->cache)
 
+/**
+ * Gets the file descriptor for a file by its file information provided by FUSE
+ * 
+ * @param   FI:struct fuse_file_info*  The file information
+ * @return  :uint64_t                  The file's descriptor
+ */
+#define ffd(FI)  (((struct pram_file_info*)(void*)((FI)->fh))->fd)
+

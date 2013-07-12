@@ -602,9 +602,38 @@ static int pram_release(const char* path, struct fuse_file_info* fi)
  */
 static int pram_write(const char* path, const char* buf, size_t len, off_t off, struct fuse_file_info* fi)
 {
-  /* TODO */
   (void) path;
-  return r(pwrite(fi->fh, buf, len, off));
+  if (len == 0)
+    return 0;
+  struct pram_file* cache = fcache(fi);
+  if (cache->allocated)
+    {
+      _lock;
+      char* wbuf;
+      if (off + len > cache->attr.st_size)
+	cache->attr.st_size = off + len;
+      if (off + len <= cache->allocated)
+	wbuf = cache->buffer;
+      else
+	{
+	  wbuf = (char*)realloc(cache->buffer, (cache->allocated = off + len) * sizeof(char));
+	  if (wbuf)
+	    cache->buffer = wbuf;
+	  else
+	    {
+	      /* TODO free old cache to get more memory */
+	      _unlock;
+	      return r(pwrite(ffd(fi), buf, len, off));
+	    }
+	}
+      _unlock;
+      wbuf += off;
+      for (size_t i = 0; i != len; i++)
+	*(wbuf + i) = *(buf + i);
+      return len;
+    }
+  else
+    return r(pwrite(ffd(fi), buf, len, off));
 }
 
 /**
@@ -621,7 +650,7 @@ static int pram_read(const char* path, char* buf, size_t len, off_t off, struct 
 {
   /* TODO */
   (void) path;
-  return r(pread(fi->fh, buf, len, off));
+  return r(pread(ffd(fi), buf, len, off));
 }
 
 /**
