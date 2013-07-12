@@ -560,10 +560,32 @@ static int pram_fsyncdir(const char* path, int isdatasync, struct fuse_file_info
  */
 static int pram_fallocate(const char* path, int mode, off_t off, off_t len, struct fuse_file_info* fi)
 {
-  /* TODO */
+  (void) path;
   if (mode)
     throw EOPNOTSUPP;
   throw posix_fallocate(ffd(fi), off, len);
+  _lock;
+  struct pram_file* cache = fcache(fi);
+  int error = 0;
+  if ((unsigned long)(off + len) > cache->allocated)
+    {
+      char* buffer = (char*)realloc(cache->buffer, (off + len) * sizeof(char));
+      if (buffer == NULL)
+	error = -errno;
+      else
+	{
+	  cache->buffer = buffer;
+	  cache->allocated = off + len;
+	}
+    }
+  else
+    {
+      cache->buffer = (char*)malloc((off + len) * sizeof(char));
+      if (cache->buffer == NULL)
+	error = -errno;
+    }
+  _unlock;
+  return error;
 }
 
 /**
