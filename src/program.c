@@ -30,6 +30,7 @@ static void pram_destroy()
 {
   free(pathbuf);
   struct pram_file** file_caches = (struct pram_file**)pram_map_free(pram_file_cache);
+  struct pram_file** _file_caches = file_caches;
   struct pram_file* file_cache;
   while ((file_cache = *file_caches++))
     {
@@ -38,7 +39,7 @@ static void pram_destroy()
       free(file_cache->buffer);
       free(file_cache);
     }
-  free(file_caches);
+  free(_file_caches);
   free(pram_file_cache);
   /* pthread_cancel(background_thread); */
   /* pthread_join(background_thread, NULL); */
