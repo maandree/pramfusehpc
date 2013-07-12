@@ -489,7 +489,7 @@ static int pram_flock(const char* path, struct fuse_file_info* fi, int op)
 {
   /* TODO */
   (void) path;
-  return r(flock(fi->fh, op));
+  return r(flock(ffd(fi), op));
 }
 
 /**
@@ -503,7 +503,7 @@ static int pram_flock(const char* path, struct fuse_file_info* fi, int op)
 static int pram_fsyncdir(const char* path, int isdatasync, struct fuse_file_info* fi)
 {
   (void) path;
-  return r(isdatasync ? fdatasync(fi->fh) : fsync(fi->fh));  /* TODO dir is not cached */
+  return r(isdatasync ? fdatasync(ffd(fi)) : fsync(ffd(fi)));  /* TODO dir is not cached */
 }
 
 /**
@@ -521,11 +521,11 @@ static int pram_fallocate(const char* path, int mode, off_t off, off_t len, stru
   /* TODO */
   (void) path;
   #ifdef linux
-    return r(fallocate(fi->fh, mode, off, len));
+    return r(fallocate(ffd(fi), mode, off, len));
   #else
     if (mode)
       throw EOPNOTSUPP;
-    throw posix_fallocate(fi->fh, off, len);
+    throw posix_fallocate(ffd(fi), off, len);
   #endif
 }
 
@@ -609,7 +609,7 @@ static int pram_fsync(const char* path, int isdatasync, struct fuse_file_info* f
   int error = pram_flush(path, fi);
   if (error)
     return error;
-  return r(isdatasync ? fdatasync(fi->fh) : fsync(fi->fh));
+  return r(isdatasync ? fdatasync(ffd(fi)) : fsync(ffd(fi)));
 }
 
 /**
