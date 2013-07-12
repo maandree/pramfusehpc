@@ -569,10 +569,43 @@ static int pram_lock(const char* path, struct fuse_file_info* fi, int cmd, struc
  */
 static int pram_flush(const char* path, struct fuse_file_info* fi)
 {
-  /* TODO */
   (void) path;
   /* FILE* is needed for fflush, and there is not flush, so we need to duplicate and close  */
-  return r(close(dup(fi->fh)));
+  struct pram_file* cache = fcache(fi);
+  uint64_t fd = ffd(fi);
+  unsigned long n;
+  _lock;
+  if ((n = cache->allocated))
+    {
+      cache->allocated = 0;
+      char* buffer = cache->buffer;
+      cache->buffer = NULL;
+      _unlock;
+      unsigned long ptr = 0, wrote;
+      while (ptr < 0)
+	{
+	  ptr += wrote = pwrite(fd, buffer + ptr, n - ptr, ptr);
+	  if (wrote == 0)
+	    errno = EIO;
+	  if (wrote <= 0)
+	    {
+	      _lock;
+	      if (cache->allocated)
+		free(buffer);
+	      else
+		{
+		  cache->allocated = n;
+		  cache->buffer;
+		}
+	      _unlock;
+	      throw wrote;
+	    }
+	}
+      free(buffer);
+    }
+  else
+    _unlock;
+  return r(close(dup(fd)));
 }
 
 /**
@@ -675,7 +708,7 @@ static int pram_read(const char* path, char* buf, size_t len, off_t off, struct 
       uint64_t fd = ffd(fi);
       while (ptr < n)
 	{
-	  ssize_t r = pread(fd, buffer, n - ptr, ptr);
+	  ssize_t r = pread(fd, buffer + ptr, n - ptr, ptr);
 	  if (r < 0)
 	    {
 	      if ((cache->allocated = ptr) == 0)
