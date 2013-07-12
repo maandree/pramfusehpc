@@ -604,6 +604,7 @@ static int pram_release(const char* path, struct fuse_file_info* fi)
  */
 static int pram_write(const char* path, const char* buf, size_t len, off_t off, struct fuse_file_info* fi)
 {
+  /* TODO what if this is not a regular file */
   (void) path;
   if (len == 0)
     return 0;
@@ -650,9 +651,64 @@ static int pram_write(const char* path, const char* buf, size_t len, off_t off, 
  */
 static int pram_read(const char* path, char* buf, size_t len, off_t off, struct fuse_file_info* fi)
 {
-  /* TODO */
+  /* TODO what if this is not a regular file */
   (void) path;
-  return r(pread(ffd(fi), buf, len, off));
+  if (len == 0)
+    return 0;
+  struct pram_file* cache = fcache(fi);
+  _lock;
+  unsigned long n = off + len;
+  if (n > (unsigned long)(cache->attr.st_size))
+    n = cache->attr.st_size;
+  if (cache->allocated == 0)
+    {
+      char* buffer = (char*)malloc(n * sizeof(buf));
+      if (buf == NULL)
+	{
+	  /* TODO free old cache to get more memory */
+	  _unlock;
+	  return r(pread(ffd(fi), buf, len, off));
+	}
+      cache->allocated = n;
+      cache->buffer = buffer;
+      _unlock;
+      unsigned long ptr = 0;
+      uint64_t fd = ffd(fi);
+      while (ptr < n)
+	{
+	  ssize_t r = pread(fd, buffer, n - ptr, ptr);
+	  if (r < 0)
+	    {
+	      if ((cache->allocated = ptr) == 0)
+		{
+		  _lock;
+		  free(buffer);
+		  cache->buffer = NULL;
+		  _unlock;
+		  throw errno;
+		}
+	    }
+	  if (r == 0)
+	    {
+	      n = ptr;
+	      _lock;
+	      cache->allocated = n;
+	      buffer = (char*)realloc(buffer, n * sizeof(char*));
+	      if (buffer)
+		cache->buffer = buffer;
+	      _unlock;
+	      break;
+	    }
+	  ptr += r;
+	}
+    }
+  n -= off;
+  if (n >> 31)
+    n = len & ((1L << 32) - 1L);
+  char* buffer = cache->buffer + off;
+  for (unsigned long i = 0; i != n; i++)
+    *(buf + i) = *(buffer + i);
+  return n;
 }
 
 /**
