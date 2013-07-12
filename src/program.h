@@ -143,6 +143,21 @@ struct pram_file
    * The size of `link`
    */
   unsigned long linkn;
+  
+  /**
+   * Number of shared locks
+   */
+  long locks;
+  
+  /**
+   * Owner of exclusive lock, if any
+   */
+  pid_t exclusive;
+  
+  /**
+   * Owner of exclusive lock
+   */
+  pthread_mutex_t mutex;
 };
 
 
