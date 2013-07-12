@@ -561,14 +561,9 @@ static int pram_fsyncdir(const char* path, int isdatasync, struct fuse_file_info
 static int pram_fallocate(const char* path, int mode, off_t off, off_t len, struct fuse_file_info* fi)
 {
   /* TODO */
-  (void) path;
-  #ifdef linux
-    return r(fallocate(ffd(fi), mode, off, len));
-  #else
-    if (mode)
-      throw EOPNOTSUPP;
-    throw posix_fallocate(ffd(fi), off, len);
-  #endif
+  if (mode)
+    throw EOPNOTSUPP;
+  throw posix_fallocate(ffd(fi), off, len);
 }
 
 /**
