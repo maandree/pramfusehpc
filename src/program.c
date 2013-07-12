@@ -24,6 +24,28 @@
 
 
 /**
+ * Clean up the file system for exit
+ */
+static void pram_destroy()
+{
+  free(pathbuf);
+  struct pram_file** file_caches = (struct pram_file**)pram_map_free(pram_file_cache);
+  struct pram_file* file_cache;
+  while ((file_cache = *file_caches++))
+    {
+      pthread_mutex_destroy(&(file_cache->mutex));
+      free(file_cache->link);
+      free(file_cache->buffer);
+      free(file_cache);
+    }
+  free(file_caches);
+  free(pram_file_cache);
+  /* pthread_cancel(background_thread); */
+  /* pthread_join(background_thread, NULL); */
+  pthread_mutex_destroy(&pram_mutex);
+}
+
+/**
  * Change the permission bits of a file
  * 
  * @param   path  The file
@@ -1037,8 +1059,8 @@ static int pram_utimens(const char* path, const struct timespec ts[2])
  * The file system operations
  */
 static struct fuse_operations pram_oper = {
-  /* .destroy = pram_destroy,  :  void() // Clean up the file system for exit */
   /* .init = pram_init,  :  void*(struct fuse_conn_info *conn) // Initialise filesystem */
+  .destroy = pram_destroy,
   .chmod = pram_chmod,
   .chown = pram_chown,
   .getattr = pram_getattr,
@@ -1184,24 +1206,9 @@ int main(int argc, char** argv)
   pram_file_cache = (pram_map*)malloc(sizeof(pram_map));
   pram_map_init(pram_file_cache);
   
-  int rc = fuse_main(_argc, _argv, &pram_oper, NULL);
   free(hdd);
+  int rc = fuse_main(_argc, _argv, &pram_oper, NULL);
   free(_argv);
-  free(pathbuf);
-  struct pram_file** file_caches = (struct pram_file**)pram_map_free(pram_file_cache);
-  struct pram_file* file_cache;
-  while ((file_cache = *file_caches++))
-    {
-      pthread_mutex_destroy(&(file_cache->mutex));
-      free(file_cache->link);
-      free(file_cache->buffer);
-      free(file_cache);
-    }
-  free(file_caches);
-  free(pram_file_cache);
-  /* pthread_cancel(background_thread); */
-  /* pthread_join(background_thread, NULL); */
-  pthread_mutex_destroy(&pram_mutex);
   return rc;
 }
 
