@@ -24,10 +24,27 @@
 
 
 /**
- * Clean up the file system for exit
+ * Initialise filesystem
+ * 
+ * @param   conn  FUSE connection information
+ * @return        Private use output
  */
-static void pram_destroy()
+static void* pram_init(struct fuse_conn_info* conn)
 {
+  (void) conn;
+  pram_file_cache = (pram_map*)malloc(sizeof(pram_map));
+  pram_map_init(pram_file_cache);
+  return NULL;
+}
+
+/**
+ * Clean up the file system for exit
+ * 
+ * @param  data  Private use input
+ */
+static void pram_destroy(void* data)
+{
+  (void) data;
   free(pathbuf);
   struct pram_file** file_caches = (struct pram_file**)pram_map_free(pram_file_cache);
   struct pram_file** _file_caches = file_caches;
@@ -1060,7 +1077,7 @@ static int pram_utimens(const char* path, const struct timespec ts[2])
  * The file system operations
  */
 static struct fuse_operations pram_oper = {
-  /* .init = pram_init,  :  void*(struct fuse_conn_info *conn) // Initialise filesystem */
+  .init = pram_init,
   .destroy = pram_destroy,
   .chmod = pram_chmod,
   .chown = pram_chown,
@@ -1203,9 +1220,6 @@ int main(int argc, char** argv)
       j++;
     else
       *(_argv + k++) = *(argv + j);
-  
-  pram_file_cache = (pram_map*)malloc(sizeof(pram_map));
-  pram_map_init(pram_file_cache);
   
   free(hdd);
   int rc = fuse_main(_argc, _argv, &pram_oper, NULL);
