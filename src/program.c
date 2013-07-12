@@ -612,7 +612,7 @@ static int pram_write(const char* path, const char* buf, size_t len, off_t off, 
     {
       _lock;
       char* wbuf;
-      if (off + len > cache->attr.st_size)
+      if (off + len > (unsigned long)(cache->attr.st_size))
 	cache->attr.st_size = off + len;
       if (off + len <= cache->allocated)
 	wbuf = cache->buffer;
