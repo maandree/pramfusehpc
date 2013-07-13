@@ -585,6 +585,9 @@ static int pram_readlink(const char* path, char* target, size_t size)
  */
 static int pram_flock(const char* path, struct fuse_file_info* fi, int op)
 {
+  /* TODO A process may hold only one type of lock (shared or exclusive) on a file.  Subsequent flock() calls on an already locked file will convert an existing lock to the new lock mode. */
+  /* TODO Is there any rule for having both shared and exclusives locks on a file, or is it up to the filesystem to choose behaviour is such case? */
+  
   (void) path;
   struct pram_file* cache = fcache(fi);
   _lock;
