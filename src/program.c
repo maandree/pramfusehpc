@@ -51,7 +51,6 @@ static void pram_destroy(void* data)
   struct pram_file* file_cache;
   while ((file_cache = *file_caches++))
     {
-      pthread_mutex_destroy(&(file_cache->mutex));
       free(file_cache->link);
       free(file_cache->buffer);
       free(file_cache);
@@ -433,7 +432,6 @@ static int pram_unlink(const char* path)
       cache->attr.st_nlink--;
       if (cache->attr.st_nlink == 0)
 	{
-	  pthread_mutex_destroy(&(cache->mutex));
 	  free(cache->buffer);
 	  free(cache->link);
 	  free(cache);
@@ -585,51 +583,8 @@ static int pram_readlink(const char* path, char* target, size_t size)
  */
 static int pram_flock(const char* path, struct fuse_file_info* fi, int op)
 {
-  /* TODO A process may hold only one type of lock (shared or exclusive) on a file.  Subsequent flock() calls on an already locked file will convert an existing lock to the new lock mode. */
-  
   (void) path;
-  struct pram_file* cache = fcache(fi);
-  _lock;
-  int lock_op = op & ~LOCK_NB;
-  int error = 0;
-  pid_t pid = fuse_get_context()->pid;
-  if ((lock_op == LOCK_SH) || (lock_op == LOCK_EX))
-    {
-      if (++(cache->locks) == 0)
-	{
-	  cache->locks--;
-	  _unlock;
-	  throw ENOLCK;
-	}
-      if (cache->exclusive || ((lock_op == LOCK_EX) && (cache->locks != 0)))
-	{
-	  if ((op & LOCK_NB) && cache->locks)
-	    {
-	      _unlock;
-	      throw EWOULDBLOCK;
-	    }
-	  _unlock;
-	  pthread_mutex_lock(&(cache->mutex));
-	  if (pid != cache->exclusive)
-	      pthread_mutex_unlock(&(cache->mutex));
-	}
-      else
-	_unlock;
-      return 0;
-    }
-  else if (lock_op == LOCK_UN)
-    {
-      cache->locks--;
-      if (cache->exclusive == pid)
-	{
-	  cache->exclusive = 0;
-	  pthread_mutex_unlock(&(cache->mutex));
-	}
-    }
-  else
-    error = EINVAL;
-  _unlock;
-  throw error;
+  return r(flock(ffd(fi), op));
 }
 
 /**
@@ -1342,7 +1297,6 @@ int get_file_cache(const char* path, struct pram_file** cache)
       c->allocated = 0;
       c->link = NULL;
       c->linkn = 0;
-      pthread_mutex_init(&(c->mutex), NULL);
       pram_map_put(pram_file_cache, path, c);
     }
   else
